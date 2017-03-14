@@ -7,7 +7,7 @@ Plugin for running build tasks inside a docker container.
 ## Issues
 
 For general Q/A please post to [Stack Overflow](http://stackoverflow.com/) with the tag `#go-docker-build-plugin`. I
-(we, hopefully) will watch this tag, others will be ignored. If your're sure you have a legitimate bug report, please
+(we, hopefully) will watch this tag, others will be ignored. If you're sure you have a legitimate bug report, please
 create an issue against this repository.
 
 ## Contributing
