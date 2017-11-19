@@ -9,14 +9,15 @@ import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 
-import javax.json.Json;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import javax.json.Json;
 
 
 @Extension
@@ -26,13 +27,13 @@ public class DockerBuildTask extends AbstractGoPlugin {
   public GoPluginApiResponse handle(GoPluginApiRequest requestMessage) throws UnhandledRequestTypeException {
     switch (requestMessage.requestName()) {
       case "configuration":
-        return handleConfigRequest(requestMessage);
+        return handleConfigRequest();
       case "view":
-        return handleViewRequest(requestMessage);
+        return handleViewRequest();
       case "validate":
-        return handleValidateRequest(requestMessage);
+        return handleValidateRequest();
       case "execute":
-        return handleExecuteRequest(requestMessage);
+        return handleExecuteRequest();
       default:
         throw new UnhandledRequestTypeException(requestMessage.requestName());
     }
@@ -40,10 +41,10 @@ public class DockerBuildTask extends AbstractGoPlugin {
 
   @Override
   public GoPluginIdentifier pluginIdentifier() {
-    return new GoPluginIdentifier("task", Arrays.asList("1.0"));
+    return new GoPluginIdentifier("task", Collections.singletonList("1.0"));
   }
 
-  private GoPluginApiResponse handleExecuteRequest(GoPluginApiRequest requestMessage) {
+  private GoPluginApiResponse handleExecuteRequest() {
     JobConsoleLogger.getConsoleLogger().printLine("Hello world!");
 
     final Map<String, Object> body = new HashMap<>();
@@ -53,18 +54,20 @@ public class DockerBuildTask extends AbstractGoPlugin {
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
 
-  private GoPluginApiResponse handleValidateRequest(GoPluginApiRequest requestMessage) {
+  private GoPluginApiResponse handleValidateRequest() {
     final Map<String, Object> body = new HashMap<>();
     body.put("errors", new HashMap<String, Object>());
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
 
-  private GoPluginApiResponse handleViewRequest(GoPluginApiRequest requestMessage) {
+  private GoPluginApiResponse handleViewRequest() {
     try {
-      final String template = new BufferedReader(new InputStreamReader(
-          getClass().getResourceAsStream("/templates/task.template.html"), StandardCharsets.UTF_8))
-          .lines().collect(Collectors.joining("\n"));
+      final String template;
+      try (BufferedReader reader = new BufferedReader(new InputStreamReader(
+          getClass().getResourceAsStream("/templates/task.template.html"), StandardCharsets.UTF_8))) {
+        template = reader.lines().collect(Collectors.joining("\n"));
+      }
 
       final Map<String, Object> body = new HashMap<>();
       body.put("displayValue", "Docker Build");
@@ -78,7 +81,7 @@ public class DockerBuildTask extends AbstractGoPlugin {
     }
   }
 
-  private GoPluginApiResponse handleConfigRequest(GoPluginApiRequest requestMessage) {
+  private GoPluginApiResponse handleConfigRequest() {
     final Map<String, Object> body = new HashMap<>();
     final Map<String, Object> placeholder = new HashMap<>();
     placeholder.put("required", Boolean.FALSE);
