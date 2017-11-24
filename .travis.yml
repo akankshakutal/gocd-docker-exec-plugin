@@ -5,3 +5,17 @@ jvm:
 branches:
   only:
     - master
+env:
+  global:
+    - CC_TEST_REPORTER_ID=12e323d3da860c6eafe0a10d9fc50922b0c8b5bd766a9f7a289106106663d045
+
+before_script:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+script:
+  - gradle check
+  - gradle jacocoTestReport
+after_script:
+  - gradle jacocoCodeclimate
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT

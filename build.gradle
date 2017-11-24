@@ -2,6 +2,7 @@ group 'io.bitgrillr'
 version '1.0.0-SNAPSHOT'
 
 apply plugin: 'java'
+apply plugin: 'jacoco'
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -18,7 +19,11 @@ dependencies {
     library group: 'javax.json', name: 'javax.json-api', version: '1.1+'
     library group: 'org.glassfish', name: 'javax.json', version: '1.1+'
     compileOnly group: 'cd.go.plugin', name: 'go-plugin-api', version: '17.3+'
+    testCompile group: 'cd.go.plugin', name: 'go-plugin-api', version: '17.3+'
     testCompile group: 'junit', name: 'junit', version: '4.12'
+    testCompile group: 'org.mockito', name: 'mockito-core', version: '2.11+'
+    testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.0-beta.5'
+    testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
 
     configurations.compile.extendsFrom(configurations.library)
 }
@@ -31,4 +36,23 @@ jar {
     into('lib') {
         from configurations.library
     }
+}
+
+jacocoTestReport {
+    reports {
+        xml.enabled true
+    }
+}
+
+test {
+    jacoco {
+        includes = ['io.bitgrillr.*']
+    }
+}
+
+task jacocoCodeclimate(type: Copy) {
+    from 'build/reports/jacoco/test/jacocoTestReport.xml'
+    into './'
+    rename { String fileName -> fileName.replace("jacocoTestReport.xml", "jacoco.xml") }
+    filter { line -> line.replaceAll("io/", "src/main/java/io/") }
 }
