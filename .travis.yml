@@ -2,3 +2,6 @@
 language: java
 jvm:
   - oraclejdk8
+branches:
+  only:
+    - master
