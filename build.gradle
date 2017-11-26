@@ -1,3 +1,8 @@
+plugins {
+    id 'com.avast.gradle.docker-compose' version '0.6.6'
+    id 'org.unbroken-dome.test-sets' version '1.4.2'
+}
+
 group 'io.bitgrillr'
 version '1.0.0-SNAPSHOT'
 
@@ -9,6 +14,10 @@ targetCompatibility = 1.8
 
 repositories {
     jcenter()
+}
+
+testSets {
+    integrationTest
 }
 
 configurations {
@@ -24,12 +33,14 @@ dependencies {
     testCompile group: 'org.mockito', name: 'mockito-core', version: '2.11+'
     testCompile group: 'org.powermock', name: 'powermock-api-mockito2', version: '2.0.0-beta.5'
     testCompile group: 'org.powermock', name: 'powermock-module-junit4', version: '2.0.0-beta.5'
+    integrationTestCompile group: 'org.apache.httpcomponents', name: 'httpclient', version: '4.5+'
+    integrationTestCompile group: 'org.apache.httpcomponents', name: 'fluent-hc', version: '4.5+'
 
     configurations.compile.extendsFrom(configurations.library)
 }
 
 processResources {
-    expand(project.properties)
+    expand project.properties
 }
 
 jar {
@@ -53,6 +64,26 @@ test {
 task jacocoCodeclimate(type: Copy) {
     from 'build/reports/jacoco/test/jacocoTestReport.xml'
     into './'
-    rename { String fileName -> fileName.replace("jacocoTestReport.xml", "jacoco.xml") }
+    rename { fileName -> fileName.replace("jacocoTestReport.xml", "jacoco.xml") }
     filter { line -> line.replaceAll("io/", "src/main/java/io/") }
 }
+
+check.dependsOn jacocoTestReport
+jacocoTestReport.mustRunAfter test
+check.dependsOn jacocoCodeclimate
+jacocoCodeclimate.mustRunAfter jacocoTestReport
+
+processIntegrationTestResources {
+    filesNotMatching('**/passwd') { file -> file.expand project.properties }
+    filesMatching(['**/cruise-config.xml', '**/passwd']) { file -> file.mode = 0777 }
+}
+
+dockerCompose {
+    useComposeFiles = ['build/resources/integrationTest/docker-compose.yml']
+}
+
+dockerCompose.isRequiredBy integrationTest
+composeUp.dependsOn assemble
+composeUp.dependsOn processIntegrationTestResources
+check.dependsOn integrationTest
+integrationTest.mustRunAfter test
