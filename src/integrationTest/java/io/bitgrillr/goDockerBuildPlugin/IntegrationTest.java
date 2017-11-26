@@ -1,7 +1,7 @@
 package io.bitgrillr.goDockerBuildPlugin;
 
-import static org.junit.Assert.*;
 import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.*;
 
 import io.bitgrillr.goDockerBuildPlugin.utils.GoTestUtils;
 import org.junit.Test;
