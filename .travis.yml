@@ -5,12 +5,15 @@ jvm:
 branches:
   only:
     - master
-env:
-  global:
-    - CC_TEST_REPORTER_ID=12e323d3da860c6eafe0a10d9fc50922b0c8b5bd766a9f7a289106106663d045
 sudo: required
 services:
   - docker
+env:
+  global:
+    - CC_TEST_REPORTER_ID=12e323d3da860c6eafe0a10d9fc50922b0c8b5bd766a9f7a289106106663d045
+  matrix:
+    - GOCD_VERSION=17.3.0
+    - GOCD_VERSION=17.11.0
 
 before_script:
   - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
