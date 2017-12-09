@@ -9,11 +9,14 @@
   exception of 120 char line limit.
 * New code should be unit tested.
 * New functionality should be minimally happy-path tested in integration tests.
-* All pull requests are required to follow the DCO process by adding the following to the commit message
+* All pull requests are required to follow the DCO process by adding the following line to the commit message
+
   ```
   Signed-off-by: John Doe <jdoe@jdoe.net>
   ```
+  
   By adding the above, you agree to the [following](https://developercertificate.org/):
+  
   ```
   Developer's Certificate of Origin 1.1
 
