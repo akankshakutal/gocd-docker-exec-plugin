@@ -1,0 +1,31 @@
+language: java
+jvm:
+  - oraclejdk8
+branches:
+  only:
+    - master
+sudo: required
+services:
+  - docker
+env:
+  global:
+    - CC_TEST_REPORTER_ID=12e323d3da860c6eafe0a10d9fc50922b0c8b5bd766a9f7a289106106663d045
+  matrix:
+    - GOCD_VERSION=17.3.0
+    - GOCD_VERSION=17.11.0
+
+before_script:
+  - curl -L https://codeclimate.com/downloads/test-reporter/test-reporter-latest-linux-amd64 > ./cc-test-reporter
+  - chmod +x ./cc-test-reporter
+  - ./cc-test-reporter before-build
+after_script:
+  - ./cc-test-reporter after-build --exit-code $TRAVIS_TEST_RESULT
+deploy:
+  provider: releases
+  api_key:
+    secure: u3fHAMi2Hk5x3+eLFeU6Fz0YvC5qOatVj91lO3nfjod1TDenrnWaWXhtAqa/WiPBD9or7/O9EpDPZ4kORVLwUh2b2JwTGLKoQ8CNl7k/H8+MtHc1zKfl8GWSJ0yjH2DCg5Bjy6QXZM8PXv6u0YudMF1/fjsI7wavfkoI/fSlim12HOaulGgtSHHqUDM4iY8Njgbnt30ljuNrrMeRD7LcFh3dywWKemyVA7YqG/qG4sFNWPO/cjzB6x3JDEozIpL9+hToPtrTWxh9qXQypYV93yX+ZYoyen9cOZS+NKwurIURFGICEblGAvyUrTnDOh+sshOTzLdTyFGEg49FGbT/L6VEj+GUa5B82INTD0WuX0QLQ8rUTq/K/81BY7tkwq8Xhhx0r2NTmYTh1cBAIql7L1Av1xqELnNs/pMRzNCTl8i6FLjlg57dTbQ507BeB6Fd5jdQ2d2iKCML//hWeI1G3vTFVkZji8v5/vosykJUW0JxtGcEwSGhYQ5evdACFS6X9j/s2/4SQmPU18CIaLaz5n6AHY3TI4T3Q4hsFDdgs8kvNn+ptLUHF2s4MO+Fz7KeOCpgelxlHVJZeu3bBQCW4YRViaH+Bo4SfquUglb/sgo0HqpgPKR6KT3CQfcEJnBQB0XjZvsGQlFJVut2s+4Ql/uAfoWu+sVQetAlLyxBesY=
+  file: ./build/libs/godockerbuildplugin-1.0.0.jar
+  on:
+    repo: cma-arnold/go-docker-build-plugin
+    tags: true
+    condition: $GOCD_VERSION = "17.3.0"

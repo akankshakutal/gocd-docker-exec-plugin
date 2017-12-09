@@ -1,0 +1,22 @@
+---
+version: '3'
+services:
+  go-server:
+    image: 'gocd/gocd-server:v${System.env.GOCD_VERSION ?: "17.3.0"}'
+    ports:
+      - '8154:8154'
+      - '8153:8153'
+    volumes:
+      - '../../libs:/godata/plugins/external'
+      - '../../resources/integrationTest/cruise-config.xml:/godata/config/cruise-config.xml'
+      - '../../resources/integrationTest/passwd:/passwd'
+  go-agent:
+    build: './docker'
+    volumes:
+      - '/var/run/docker.sock:/var/run/docker.sock'
+    environment:
+      - 'GO_SERVER_URL=https://go-server:8154/go'
+      - 'AGENT_AUTO_REGISTER_KEY=a15bb795-ff2c-41f4-b882-6851930a71b9'
+      - 'AGENT_AUTO_REGISTER_HOSTNAME=go-agent'
+      - 'AGENT_AUTO_REGISTER_ENVIRONMENTS=test'
+      - 'AGENT_AUTO_REGISTER_RESOURCES=docker'
