@@ -1,4 +1,4 @@
-package io.bitgrillr.goDockerBuildPlugin;
+package io.bitgrillr.godockerbuildplugin;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;

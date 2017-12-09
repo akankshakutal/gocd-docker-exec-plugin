@@ -1,4 +1,4 @@
-package io.bitgrillr.goDockerBuildPlugin;
+package io.bitgrillr.godockerbuildplugin;
 
 import com.thoughtworks.go.plugin.api.AbstractGoPlugin;
 import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
