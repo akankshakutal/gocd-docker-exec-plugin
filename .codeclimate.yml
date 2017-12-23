@@ -2,7 +2,10 @@
 checks:
   method-complexity:
     config:
-      threshold: 10
+      threshold: 15
+  method-lines:
+    config:
+      threshold: 45
 plugins:
   checkstyle:
     enabled: true
@@ -13,7 +16,8 @@ plugins:
     config:
       sonar.java.source: 8
       tests_patterns:
-        - 'src/test/**/*'
-        - 'src/integrationTest/**/*'
+        - 'src/test/**'
+        - 'src/integrationTest/**'
+        - 'src/dockerTest/**'
   pmd:
     enabled: true

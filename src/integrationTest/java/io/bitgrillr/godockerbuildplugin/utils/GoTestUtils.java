@@ -15,6 +15,9 @@ import org.apache.http.client.fluent.Executor;
 import org.apache.http.client.fluent.Request;
 import org.apache.http.client.fluent.Response;
 
+/**
+ * Contains various methods for interacting with a Go.cd server via it's REST API.
+ */
 public class GoTestUtils {
 
   private static final String BASE_URL = "http://localhost:8153/go/";

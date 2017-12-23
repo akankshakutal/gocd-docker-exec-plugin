@@ -1,5 +1,6 @@
 package io.bitgrillr.godockerbuildplugin;
 
+import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.thoughtworks.go.plugin.api.AbstractGoPlugin;
 import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
 import com.thoughtworks.go.plugin.api.annotation.Extension;
@@ -9,6 +10,7 @@ import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 
+import io.bitgrillr.godockerbuildplugin.docker.DockerUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -21,6 +23,9 @@ import javax.json.Json;
 
 @Extension
 public class DockerBuildTask extends AbstractGoPlugin {
+
+  public static final String SUCCESS = "success";
+  public static final String MESSAGE = "message";
 
   @Override
   public GoPluginApiResponse handle(GoPluginApiRequest requestMessage) throws UnhandledRequestTypeException {
@@ -44,11 +49,49 @@ public class DockerBuildTask extends AbstractGoPlugin {
   }
 
   private GoPluginApiResponse handleExecuteRequest() {
-    JobConsoleLogger.getConsoleLogger().printLine("Hello world!");
-
     final Map<String, Object> body = new HashMap<>();
-    body.put("success", Boolean.TRUE);
-    body.put("message", "Task executed successfully");
+    String containerId = null;
+    boolean nestedException = false;
+    try {
+      DockerUtils.pullImage("busybox:latest");
+
+      containerId = DockerUtils.createContainer("busybox:latest");
+
+      final int exitCode = DockerUtils.execCommand(containerId, "echo", "Hello World!");
+
+      body.put(MESSAGE, (new StringBuilder()).append("Command '").append("echo Hello World!")
+          .append("' completed with status ").append(exitCode).toString());
+      if (exitCode == 0) {
+        body.put(SUCCESS, Boolean.TRUE);
+      } else {
+        body.put(SUCCESS, Boolean.FALSE);
+      }
+    } catch (ImageNotFoundException infe) {
+      nestedException = true;
+      body.put(SUCCESS, Boolean.FALSE);
+      body.put(MESSAGE, (new StringBuilder()).append("Image '").append("busybox:latest").append("' not found")
+          .toString());
+    } catch (Exception e) {
+      nestedException = true;
+      body.clear();
+      JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while executing task");
+      printException(e);
+      body.put(SUCCESS, Boolean.FALSE);
+      body.put(MESSAGE, e.getMessage());
+    } finally {
+      if (containerId != null) {
+        try {
+          DockerUtils.removeContainer(containerId);
+        } catch (Exception e) {
+          JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while removing container");
+          printException(e);
+          body.put(SUCCESS, Boolean.FALSE);
+          if (!nestedException) {
+            body.put(MESSAGE, e.getMessage());
+          }
+        }
+      }
+    }
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
@@ -87,5 +130,12 @@ public class DockerBuildTask extends AbstractGoPlugin {
     body.put("PLACEHOLDER", placeholder);
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
+  }
+
+  private void printException(Exception e) {
+    JobConsoleLogger.getConsoleLogger().printLine(e.getMessage());
+    for (StackTraceElement ste : e.getStackTrace()) {
+      JobConsoleLogger.getConsoleLogger().printLine("\t" + ste.toString());
+    }
   }
 }

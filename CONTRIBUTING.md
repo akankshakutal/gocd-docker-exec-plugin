@@ -58,9 +58,13 @@
   * `gradle assemble`
 * Unit Tests
   * `gradle test`
-* Integration Tests
+* Docker Tests - Tests docker interactions against the live Daemon without Go.cd. These tests respect
+    the `DOCKER_HOST` environment variable (default `unix:///var/run/docker.sock`).
+  * `gradle dockerTest`
+* Integration Tests - Uses docker-compose to bring up a server/agent pair + a docker:dind daemon to use and runs
+    functional tests.
   * `gradle integrationTest`
-* Bringing up a Go.cd server/agent pair with latest code
+* Bringing up the test Go.cd server/agent pair (password `admin/changeme`).
   * `gradle composeUp`
   * `gradle composeDown`
   * *note* - By default these use version 17.3.0, this can be changed using the GOCD_VERSION environment variable.

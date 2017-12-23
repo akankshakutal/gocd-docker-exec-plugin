@@ -11,12 +11,14 @@ services:
       - '../../resources/integrationTest/cruise-config.xml:/godata/config/cruise-config.xml'
       - '../../resources/integrationTest/passwd:/passwd'
   go-agent:
-    build: './docker'
-    volumes:
-      - '/var/run/docker.sock:/var/run/docker.sock'
+    image: 'gocd/gocd-agent-ubuntu-16.04:v${System.env.GOCD_VERSION ?: "17.3.0"}'
     environment:
       - 'GO_SERVER_URL=https://go-server:8154/go'
       - 'AGENT_AUTO_REGISTER_KEY=a15bb795-ff2c-41f4-b882-6851930a71b9'
       - 'AGENT_AUTO_REGISTER_HOSTNAME=go-agent'
       - 'AGENT_AUTO_REGISTER_ENVIRONMENTS=test'
       - 'AGENT_AUTO_REGISTER_RESOURCES=docker'
+      - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgodockerbuildplugin.dockerhost=http://docker:2375'
+  docker:
+    image: 'docker:dind'
+    privileged: true

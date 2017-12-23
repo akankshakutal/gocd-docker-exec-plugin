@@ -18,6 +18,7 @@ repositories {
 
 testSets {
     integrationTest
+    dockerTest
 }
 
 configurations {
@@ -27,6 +28,7 @@ configurations {
 dependencies {
     library group: 'javax.json', name: 'javax.json-api', version: '1.1+'
     library group: 'org.glassfish', name: 'javax.json', version: '1.1+'
+    library 'com.spotify:docker-client:8.10+'
     compileOnly group: 'cd.go.plugin', name: 'go-plugin-api', version: '17.3+'
     testCompile group: 'cd.go.plugin', name: 'go-plugin-api', version: '17.3+'
     testCompile group: 'junit', name: 'junit', version: '4.12'
@@ -39,6 +41,8 @@ dependencies {
     configurations.compile.extendsFrom(configurations.library)
 }
 
+// build
+
 processResources {
     expand project.properties
 }
@@ -48,6 +52,8 @@ jar {
         from configurations.library
     }
 }
+
+// unit tests
 
 jacocoTestReport {
     reports {
@@ -73,6 +79,29 @@ jacocoTestReport.mustRunAfter test
 check.dependsOn jacocoCodeclimate
 jacocoCodeclimate.mustRunAfter jacocoTestReport
 
+// docker tests
+
+dockerTest {
+    jacoco {
+        enabled false
+    }
+    def dockerHost = System.getenv "DOCKER_HOST"
+    if (dockerHost == null || dockerHost.isEmpty()) {
+        dockerHost = "unix:///var/run/docker.sock"
+    } else {
+        // docker-client does not like tcp protocol
+        if (dockerHost.startsWith('tcp')) {
+            dockerHost = dockerHost.replaceFirst 'tcp', 'http'
+        }
+    }
+    systemProperty 'godockerbuildplugin.dockerhost', dockerHost
+}
+
+check.dependsOn dockerTest
+dockerTest.mustRunAfter test
+
+// integration tests
+
 processIntegrationTestResources {
     filesNotMatching('**/passwd') { file -> file.expand project.properties }
     filesMatching(['**/cruise-config.xml', '**/passwd']) { file -> file.mode = 0777 }
@@ -82,8 +111,14 @@ dockerCompose {
     useComposeFiles = ['build/resources/integrationTest/docker-compose.yml']
 }
 
+integrationTest {
+    jacoco {
+        enabled false
+    }
+}
+
 dockerCompose.isRequiredBy integrationTest
 composeUp.dependsOn assemble
 composeUp.dependsOn processIntegrationTestResources
 check.dependsOn integrationTest
-integrationTest.mustRunAfter test
+integrationTest.mustRunAfter dockerTest

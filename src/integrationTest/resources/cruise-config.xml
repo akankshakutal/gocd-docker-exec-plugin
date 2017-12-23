@@ -24,6 +24,9 @@
                 </configuration>
               </task>
             </tasks>
+            <resources>
+              <resource>docker</resource>
+            </resources>
           </job>
         </jobs>
       </stage>
