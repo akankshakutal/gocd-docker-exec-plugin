@@ -4,6 +4,9 @@ jvm:
 sudo: required
 services:
   - docker
+branches:
+  only:
+    - master
 env:
   global:
     - CC_TEST_REPORTER_ID=187afecdde26bd2cdc47df23965168080f1f713d8d7dd7090416eac02e91728a
