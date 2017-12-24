@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin;
+package io.bitgrillr.gocddockerexecplugin;
 
 import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.thoughtworks.go.plugin.api.AbstractGoPlugin;
@@ -10,7 +10,7 @@ import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 
-import io.bitgrillr.godockerbuildplugin.docker.DockerUtils;
+import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -22,7 +22,7 @@ import javax.json.Json;
 
 
 @Extension
-public class DockerBuildTask extends AbstractGoPlugin {
+public class DockerExecPlugin extends AbstractGoPlugin {
 
   public static final String SUCCESS = "success";
   public static final String MESSAGE = "message";
@@ -112,7 +112,7 @@ public class DockerBuildTask extends AbstractGoPlugin {
       }
 
       final Map<String, Object> body = new HashMap<>();
-      body.put("displayValue", "Docker Build");
+      body.put("displayValue", "Docker Exec");
       body.put("template", template);
 
       return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());

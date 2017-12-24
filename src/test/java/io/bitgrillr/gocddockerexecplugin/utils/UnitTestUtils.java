@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin.utils;
+package io.bitgrillr.gocddockerexecplugin.utils;
 
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;

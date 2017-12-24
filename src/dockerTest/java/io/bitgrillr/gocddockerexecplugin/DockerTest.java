@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin;
+package io.bitgrillr.gocddockerexecplugin;
 
 import static org.hamcrest.CoreMatchers.*;
 import static org.junit.Assert.*;
@@ -7,7 +7,7 @@ import static org.mockito.Mockito.*;
 import com.spotify.docker.client.exceptions.ContainerNotFoundException;
 import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
-import io.bitgrillr.godockerbuildplugin.docker.DockerUtils;
+import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import java.util.ArrayList;
 import java.util.List;
 import org.hamcrest.CoreMatchers;

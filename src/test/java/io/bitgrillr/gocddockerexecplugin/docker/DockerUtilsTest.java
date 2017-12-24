@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin.docker;
+package io.bitgrillr.gocddockerexecplugin.docker;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.any;
@@ -22,7 +22,7 @@ import com.spotify.docker.client.messages.ExecCreation;
 import com.spotify.docker.client.messages.ExecState;
 import com.spotify.docker.client.messages.ProgressMessage;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
-import io.bitgrillr.godockerbuildplugin.utils.UnitTestUtils;
+import io.bitgrillr.gocddockerexecplugin.utils.UnitTestUtils;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.Iterator;

@@ -18,7 +18,7 @@ services:
       - 'AGENT_AUTO_REGISTER_HOSTNAME=go-agent'
       - 'AGENT_AUTO_REGISTER_ENVIRONMENTS=test'
       - 'AGENT_AUTO_REGISTER_RESOURCES=docker'
-      - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgodockerbuildplugin.dockerhost=http://docker:2375'
+      - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgocddockerexecplugin.dockerhost=http://docker:2375'
   docker:
     image: 'docker:dind'
     privileged: true

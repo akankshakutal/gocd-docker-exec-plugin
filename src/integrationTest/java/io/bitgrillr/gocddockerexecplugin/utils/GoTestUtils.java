@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin.utils;
+package io.bitgrillr.gocddockerexecplugin.utils;
 
 import java.io.BufferedReader;
 import java.io.IOException;

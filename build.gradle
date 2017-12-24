@@ -94,7 +94,7 @@ dockerTest {
             dockerHost = dockerHost.replaceFirst 'tcp', 'http'
         }
     }
-    systemProperty 'godockerbuildplugin.dockerhost', dockerHost
+    systemProperty 'gocddockerexecplugin.dockerhost', dockerHost
 }
 
 check.dependsOn dockerTest

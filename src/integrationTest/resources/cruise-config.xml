@@ -8,14 +8,14 @@
   <pipelines group="test">
     <pipeline name="test">
       <materials>
-        <git url="https://github.com/cma-arnold/go-docker-build-plugin" autoUpdate="false" />
+        <git url="https://github.com/cma-arnold/gocd-docker-exec-plugin" autoUpdate="false" />
       </materials>
       <stage name="test">
         <jobs>
           <job name="test">
             <tasks>
               <task>
-                <pluginConfiguration id="docker-build-plugin" version="1" />
+                <pluginConfiguration id="docker-exec-plugin" version="1" />
                 <configuration>
                   <property>
                     <key>PLACEHOLDER</key>

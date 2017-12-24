@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin;
+package io.bitgrillr.gocddockerexecplugin;
 
 import static org.junit.Assert.assertEquals;
 import static org.mockito.Mockito.any;
@@ -13,8 +13,8 @@ import com.thoughtworks.go.plugin.api.request.DefaultGoPluginApiRequest;
 import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
-import io.bitgrillr.godockerbuildplugin.docker.DockerUtils;
-import io.bitgrillr.godockerbuildplugin.utils.UnitTestUtils;
+import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
+import io.bitgrillr.gocddockerexecplugin.utils.UnitTestUtils;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -29,18 +29,18 @@ import org.powermock.modules.junit4.PowerMockRunner;
 
 @RunWith(PowerMockRunner.class)
 @PrepareForTest({JobConsoleLogger.class, DockerUtils.class})
-public class DockerBuildTaskTest {
+public class DockerExecPluginTest {
 
   @Test
   public void pluginIdentifier() {
-    GoPluginIdentifier identifier = new DockerBuildTask().pluginIdentifier();
+    GoPluginIdentifier identifier = new DockerExecPlugin().pluginIdentifier();
     assertEquals("Wrong type", "task", identifier.getExtension());
     assertEquals("Wrong version", Collections.singletonList("1.0"), identifier.getSupportedExtensionVersions());
   }
 
   @Test
   public void handleConfiguration() throws Exception {
-    GoPluginApiResponse response = new DockerBuildTask().handle(
+    GoPluginApiResponse response = new DockerExecPlugin().handle(
         new DefaultGoPluginApiRequest(null, null, "configuration"));
 
     assertEquals("Expected successful response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
@@ -49,7 +49,7 @@ public class DockerBuildTaskTest {
 
   @Test
   public void handleView() throws Exception {
-    GoPluginApiResponse response = new DockerBuildTask().handle(
+    GoPluginApiResponse response = new DockerExecPlugin().handle(
         new DefaultGoPluginApiRequest(null, null, "view"));
 
     assertEquals("Expected successful response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
@@ -67,7 +67,7 @@ public class DockerBuildTaskTest {
 
   @Test
   public void handleValidate() throws Exception {
-    GoPluginApiResponse response = new DockerBuildTask().handle(
+    GoPluginApiResponse response = new DockerExecPlugin().handle(
         new DefaultGoPluginApiRequest(null, null, "validate"));
 
     assertEquals("Expected successful response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
@@ -87,7 +87,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask().handle(
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(
         new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
@@ -108,7 +108,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask()
+    final GoPluginApiResponse response = new DockerExecPlugin()
         .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -122,7 +122,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doThrow(new ImageNotFoundException("busybox:latest")).when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask().handle(
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(
         new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -142,7 +142,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask()
+    final GoPluginApiResponse response = new DockerExecPlugin()
         .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -162,7 +162,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doThrow(new DockerException("FAIL")).when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask()
+    final GoPluginApiResponse response = new DockerExecPlugin()
         .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -182,7 +182,7 @@ public class DockerBuildTaskTest {
     PowerMockito.doThrow(new DockerException("FAIL2")).when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
 
-    final GoPluginApiResponse response = new DockerBuildTask()
+    final GoPluginApiResponse response = new DockerExecPlugin()
         .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -193,7 +193,7 @@ public class DockerBuildTaskTest {
 
   @Test(expected = UnhandledRequestTypeException.class)
   public void handleBadRequest() throws Exception {
-    new DockerBuildTask().handle(new DefaultGoPluginApiRequest(null, null, "badRequest"));
+    new DockerExecPlugin().handle(new DefaultGoPluginApiRequest(null, null, "badRequest"));
   }
 
 }

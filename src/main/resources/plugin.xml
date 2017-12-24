@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 
-<go-plugin id="docker-build-plugin" version="1">
+<go-plugin id="docker-exec-plugin" version="1">
   <about>
-    <name>Docker Build Plugin</name>
+    <name>Docker Exec Plugin</name>
     <version>${project.version}</version>
     <description>Task plugin for executing build tasks inside a Docker container</description>
     <target-go-version>17.3.0</target-go-version>

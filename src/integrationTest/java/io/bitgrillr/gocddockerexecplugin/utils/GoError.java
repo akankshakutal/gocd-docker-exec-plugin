@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin.utils;
+package io.bitgrillr.gocddockerexecplugin.utils;
 
 /**
  * Exception indicating Go.cd returned a non 2XX response code.

@@ -1,4 +1,4 @@
-package io.bitgrillr.godockerbuildplugin.docker;
+package io.bitgrillr.gocddockerexecplugin.docker;
 
 import com.spotify.docker.client.DefaultDockerClient;
 import com.spotify.docker.client.DockerClient;
@@ -25,7 +25,7 @@ public class DockerUtils {
 
   static DockerClient getDockerClient() {
     if (dockerClient == null) {
-      dockerClient = new DefaultDockerClient(System.getProperty("godockerbuildplugin.dockerhost",
+      dockerClient = new DefaultDockerClient(System.getProperty("gocddockerexecplugin.dockerhost",
           "unix:///var/run/docker.sock"));
     }
     return dockerClient;
