@@ -11,6 +11,7 @@
         <git url="https://github.com/cma-arnold/gocd-docker-exec-plugin" autoUpdate="false" />
       </materials>
       <stage name="test">
+        <approval type="manual" />
         <jobs>
           <job name="test">
             <tasks>
@@ -18,8 +19,34 @@
                 <pluginConfiguration id="docker-exec-plugin" version="1" />
                 <configuration>
                   <property>
-                    <key>PLACEHOLDER</key>
-                    <value />
+                    <key>IMAGE</key>
+                    <value>ubuntu:latest</value>
+                  </property>
+                </configuration>
+              </task>
+            </tasks>
+            <resources>
+              <resource>docker</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
+    <pipeline name="testNoImage">
+      <materials>
+        <git url="https://github.com/cma-arnold/gocd-docker-exec-plugin" autoUpdate="false" />
+      </materials>
+      <stage name="test">
+        <approval type="manual" />
+        <jobs>
+          <job name="test">
+            <tasks>
+              <task>
+                <pluginConfiguration id="docker-exec-plugin" version="1" />
+                <configuration>
+                  <property>
+                    <key>IMAGE</key>
+                    <value>idont:exist</value>
                   </property>
                 </configuration>
               </task>
@@ -36,6 +63,7 @@
     <environment name="test">
       <pipelines>
         <pipeline name="test" />
+        <pipeline name="testNoImage" />
       </pipelines>
     </environment>
   </environments>

@@ -1,1 +1,5 @@
-<div class="form_item_block" />
+<div class="form_item_block">
+  <label>Image:</label>
+  <input type="text" ng-model="IMAGE" ng-required="true" />
+  <span class="form_error" ng-show="GOINPUTNAME[IMAGE].$error.server">{{ GOINPUTNAME[IMAGE].$error.server }}</span>
+</div>

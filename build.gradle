@@ -44,7 +44,7 @@ dependencies {
 // build
 
 processResources {
-    expand project.properties
+    filesNotMatching('**/task.template.html') { file -> file.expand project.properties }
 }
 
 jar {

@@ -11,12 +11,34 @@ public class IntegrationTest {
 
   @Test
   public void build() throws Exception {
-    final int counter = GoTestUtils.runPipeline("test");
-    GoTestUtils.waitForPipeline("test", counter);
-    final String result = GoTestUtils.getPipelineResult("test", counter);
-    assertEquals("Expected success", "Passed", result);
-    final String log = GoTestUtils.getPipelineLog("test", 1, "test", "test");
-    assertThat("Missing message", log, containsString("Hello World!"));
+    final PipelineResult result = PipelineResult.executePipeline("test");
+    assertEquals("Expected success", "Passed", result.result);
+    assertThat("Missing message", result.log, containsString("ID=ubuntu"));
+  }
+
+  @Test
+  public void noImage() throws Exception {
+    final PipelineResult result = PipelineResult.executePipeline("testNoImage");
+    assertEquals("Expected failure", "Failed", result.result);
+    assertThat("Missing message", result.log, containsString("Image 'idont:exist' not found"));
+  }
+
+  private static class PipelineResult {
+    public final String result;
+    public final String log;
+
+    private PipelineResult(final String result, final String log) {
+      this.result = result;
+      this.log = log;
+    }
+
+    public static PipelineResult executePipeline(String pipeline) throws Exception {
+      final int counter = GoTestUtils.runPipeline(pipeline);
+      GoTestUtils.waitForPipeline(pipeline, counter);
+      final String result = GoTestUtils.getPipelineResult(pipeline, counter);
+      final String log = GoTestUtils.getPipelineLog(pipeline, counter, "test", "test");
+      return new PipelineResult(result, log);
+    }
   }
 
 }

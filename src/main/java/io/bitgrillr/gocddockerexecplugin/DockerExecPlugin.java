@@ -13,31 +13,49 @@ import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.json.Json;
+import javax.json.JsonObject;
 
 
 @Extension
 public class DockerExecPlugin extends AbstractGoPlugin {
 
-  public static final String SUCCESS = "success";
-  public static final String MESSAGE = "message";
+  private static final String SUCCESS = "success";
+  private static final String MESSAGE = "message";
+  private static final String IMAGE = "IMAGE";
+  private static final String IMAGE_REGEX =
+      "([a-zA-Z][\\w\\-]*(\\.[a-zA-Z][\\w-]*)*(:\\d+)?/)?(\\w[\\w_\\-.]*/)?\\w[\\w_\\-.]*(:\\w[\\w_\\-.]*)?";
 
   @Override
   public GoPluginApiResponse handle(GoPluginApiRequest requestMessage) throws UnhandledRequestTypeException {
+    final JsonObject requestBody;
+    if (requestMessage.requestBody() != null) {
+      requestBody = Json.createReader(new StringReader(requestMessage.requestBody())).readObject();
+    } else {
+      requestBody = null;
+    }
     switch (requestMessage.requestName()) {
       case "configuration":
         return handleConfigRequest();
       case "view":
         return handleViewRequest();
       case "validate":
-        return handleValidateRequest();
+        if (requestBody == null) {
+          throw new IllegalArgumentException("Request body null");
+        }
+        return handleValidateRequest(requestBody);
       case "execute":
-        return handleExecuteRequest();
+        if (requestBody == null) {
+          throw new IllegalArgumentException("Request body null");
+        }
+        return handleExecuteRequest(requestBody);
       default:
         throw new UnhandledRequestTypeException(requestMessage.requestName());
     }
@@ -48,36 +66,37 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     return new GoPluginIdentifier("task", Collections.singletonList("1.0"));
   }
 
-  private GoPluginApiResponse handleExecuteRequest() {
-    final Map<String, Object> body = new HashMap<>();
+  private GoPluginApiResponse handleExecuteRequest(JsonObject requestBody) {
+    final String image = requestBody.getJsonObject("config").getJsonObject(IMAGE).getString("value");
+
+    final Map<String, Object> responseBody = new HashMap<>();
     String containerId = null;
     boolean nestedException = false;
     try {
-      DockerUtils.pullImage("busybox:latest");
+      DockerUtils.pullImage(image);
 
-      containerId = DockerUtils.createContainer("busybox:latest");
+      containerId = DockerUtils.createContainer(image);
 
-      final int exitCode = DockerUtils.execCommand(containerId, "echo", "Hello World!");
+      final int exitCode = DockerUtils.execCommand(containerId, "cat", "/etc/os-release");
 
-      body.put(MESSAGE, (new StringBuilder()).append("Command '").append("echo Hello World!")
+      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("cat /etc/os-release")
           .append("' completed with status ").append(exitCode).toString());
       if (exitCode == 0) {
-        body.put(SUCCESS, Boolean.TRUE);
+        responseBody.put(SUCCESS, Boolean.TRUE);
       } else {
-        body.put(SUCCESS, Boolean.FALSE);
+        responseBody.put(SUCCESS, Boolean.FALSE);
       }
     } catch (ImageNotFoundException infe) {
       nestedException = true;
-      body.put(SUCCESS, Boolean.FALSE);
-      body.put(MESSAGE, (new StringBuilder()).append("Image '").append("busybox:latest").append("' not found")
-          .toString());
+      responseBody.put(SUCCESS, Boolean.FALSE);
+      responseBody.put(MESSAGE, (new StringBuilder()).append("Image '").append(image).append("' not found").toString());
     } catch (Exception e) {
       nestedException = true;
-      body.clear();
+      responseBody.clear();
       JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while executing task");
       printException(e);
-      body.put(SUCCESS, Boolean.FALSE);
-      body.put(MESSAGE, e.getMessage());
+      responseBody.put(SUCCESS, Boolean.FALSE);
+      responseBody.put(MESSAGE, e.getMessage());
     } finally {
       if (containerId != null) {
         try {
@@ -85,22 +104,29 @@ public class DockerExecPlugin extends AbstractGoPlugin {
         } catch (Exception e) {
           JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while removing container");
           printException(e);
-          body.put(SUCCESS, Boolean.FALSE);
+          responseBody.put(SUCCESS, Boolean.FALSE);
           if (!nestedException) {
-            body.put(MESSAGE, e.getMessage());
+            responseBody.put(MESSAGE, e.getMessage());
           }
         }
       }
     }
 
-    return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
+    return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(responseBody).build().toString());
   }
 
-  private GoPluginApiResponse handleValidateRequest() {
-    final Map<String, Object> body = new HashMap<>();
-    body.put("errors", new HashMap<String, Object>());
+  private GoPluginApiResponse handleValidateRequest(JsonObject requestBody) {
+    final Map<String, Object> responseBody = new HashMap<>();
+    final Map<String, String> errors = new HashMap<>();
 
-    return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
+    final String image = requestBody.getJsonObject(IMAGE).getString("value");
+    if (!imageValid(image)) {
+      errors.put(IMAGE, (new StringBuilder()).append("'").append(image).append("' is not a valid image identifier")
+          .toString());
+    }
+
+    responseBody.put("errors", errors);
+    return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(responseBody).build().toString());
   }
 
   private GoPluginApiResponse handleViewRequest() {
@@ -125,11 +151,16 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
   private GoPluginApiResponse handleConfigRequest() {
     final Map<String, Object> body = new HashMap<>();
-    final Map<String, Object> placeholder = new HashMap<>();
-    placeholder.put("required", Boolean.FALSE);
-    body.put("PLACEHOLDER", placeholder);
+    final Map<String, Object> image = new HashMap<>();
+    image.put("display-name", "Image");
+    image.put("display-order", "0");
+    body.put(IMAGE, image);
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
+  }
+
+  boolean imageValid(String image) {
+    return Pattern.compile(IMAGE_REGEX).matcher(image).matches();
   }
 
   private void printException(Exception e) {

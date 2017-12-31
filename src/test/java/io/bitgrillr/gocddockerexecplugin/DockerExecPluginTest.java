@@ -1,8 +1,10 @@
 package io.bitgrillr.gocddockerexecplugin;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
-import static org.mockito.Mockito.anyString;
 import static org.mockito.Mockito.when;
 
 import com.spotify.docker.client.exceptions.DockerException;
@@ -19,6 +21,8 @@ import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 import javax.json.Json;
 import javax.json.JsonObject;
 import org.junit.Test;
@@ -67,8 +71,14 @@ public class DockerExecPluginTest {
 
   @Test
   public void handleValidate() throws Exception {
-    GoPluginApiResponse response = new DockerExecPlugin().handle(
-        new DefaultGoPluginApiRequest(null, null, "validate"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "validate");
+    Map<String, Object> body = new HashMap<>();
+    Map<String, String> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    body.put("IMAGE", image);
+    request.setRequestBody(Json.createObjectBuilder(body).build().toString());
+
+    GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected successful response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
         response.responseCode());
@@ -78,23 +88,49 @@ public class DockerExecPluginTest {
   }
 
   @Test
+  public void handleValidateError() throws Exception {
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "validate");
+    Map<String, Object> body = new HashMap<>();
+    Map<String, String> image = new HashMap<>();
+    image.put("value", "ubuntu:");
+    body.put("IMAGE", image);
+    request.setRequestBody(Json.createObjectBuilder(body).build().toString());
+
+    GoPluginApiResponse response = new DockerExecPlugin().handle(request);
+
+    assertEquals("Expected successful response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
+        response.responseCode());
+    JsonObject errors = Json.createReader(new StringReader(response.responseBody()))
+        .readObject().getJsonObject("errors");
+    assertEquals("Expected 1 error", 1, errors.size());
+    assertEquals("Wrong message", "'ubuntu:' is not a valid image identifier", errors.getString("IMAGE"));
+  }
+
+  @Test
   public void handleExecute() throws Exception {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString())).thenReturn("123");
-    when(DockerUtils.execCommand(anyString(), any())).thenReturn(0);
+    DockerUtils.pullImage("ubuntu:latest");
+    when(DockerUtils.createContainer("ubuntu:latest")).thenReturn("123");
+    when(DockerUtils.execCommand(eq("123"), any())).thenReturn(0);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.removeContainer(anyString());
+    DockerUtils.removeContainer("123");
 
-    final GoPluginApiResponse response = new DockerExecPlugin().handle(
-        new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE,
         response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
     assertEquals("Expected success", Boolean.TRUE, responseBody.getBoolean("success"));
-    assertEquals("Wrong message", "Command 'echo Hello World!' completed with status 0",
+    assertEquals("Wrong message", "Command 'cat /etc/os-release' completed with status 0",
         Json.createReader(new StringReader(response.responseBody())).readObject().getString("message"));
   }
 
@@ -102,14 +138,21 @@ public class DockerExecPluginTest {
   public void handleExecuteFailure() throws Exception {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString())).thenReturn("123");
-    when(DockerUtils.execCommand(anyString(), any())).thenReturn(1);
+    DockerUtils.pullImage("ubuntu:latest");
+    when(DockerUtils.createContainer("ubuntu:latest")).thenReturn("123");
+    when(DockerUtils.execCommand(eq("123"), any())).thenReturn(1);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.removeContainer(anyString());
+    DockerUtils.removeContainer("123");
 
-    final GoPluginApiResponse response = new DockerExecPlugin()
-        .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
@@ -119,16 +162,23 @@ public class DockerExecPluginTest {
   @Test
   public void handleExecuteImageNotFound() throws Exception {
     PowerMockito.mockStatic(DockerUtils.class);
-    PowerMockito.doThrow(new ImageNotFoundException("busybox:latest")).when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
+    PowerMockito.doThrow(new ImageNotFoundException("idont:exist")).when(DockerUtils.class);
+    DockerUtils.pullImage("idont:exist");
 
-    final GoPluginApiResponse response = new DockerExecPlugin().handle(
-        new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "idont:exist");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
     assertEquals("Expected failure", Boolean.FALSE, responseBody.getBoolean("success"));
-    assertEquals("Message wrong", "Image 'busybox:latest' not found",responseBody.getString("message"));
+    assertEquals("Message wrong", "Image 'idont:exist' not found",responseBody.getString("message"));
   }
 
   @Test
@@ -136,14 +186,21 @@ public class DockerExecPluginTest {
     UnitTestUtils.mockJobConsoleLogger();
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString())).thenReturn("123");
-    when(DockerUtils.execCommand(anyString(), any())).thenThrow(new DockerException("FAIL"));
+    DockerUtils.pullImage("ubuntu:latest");
+    when(DockerUtils.createContainer("ubuntu:latest")).thenReturn("123");
+    when(DockerUtils.execCommand(eq("123"), any())).thenThrow(new DockerException("FAIL"));
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.removeContainer(anyString());
+    DockerUtils.removeContainer("123");
 
-    final GoPluginApiResponse response = new DockerExecPlugin()
-        .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
@@ -156,14 +213,21 @@ public class DockerExecPluginTest {
     UnitTestUtils.mockJobConsoleLogger();
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString())).thenReturn("123");
-    when(DockerUtils.execCommand(anyString(), any())).thenReturn(0);
+    DockerUtils.pullImage("ubuntu:latest");
+    when(DockerUtils.createContainer("ubuntu:latest")).thenReturn("123");
+    when(DockerUtils.execCommand(eq("123"), any())).thenReturn(0);
     PowerMockito.doThrow(new DockerException("FAIL")).when(DockerUtils.class);
-    DockerUtils.removeContainer(anyString());
+    DockerUtils.removeContainer("123");
 
-    final GoPluginApiResponse response = new DockerExecPlugin()
-        .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
@@ -176,14 +240,21 @@ public class DockerExecPluginTest {
     UnitTestUtils.mockJobConsoleLogger();
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
-    DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString())).thenReturn("123");
-    when(DockerUtils.execCommand(anyString(), any())).thenThrow(new DockerException("FAIL1"));
+    DockerUtils.pullImage("ubuntu:latest");
+    when(DockerUtils.createContainer("ubuntu:latest")).thenReturn("123");
+    when(DockerUtils.execCommand(eq("123"), any())).thenThrow(new DockerException("FAIL1"));
     PowerMockito.doThrow(new DockerException("FAIL2")).when(DockerUtils.class);
-    DockerUtils.removeContainer(anyString());
+    DockerUtils.removeContainer("123");
 
-    final GoPluginApiResponse response = new DockerExecPlugin()
-        .handle(new DefaultGoPluginApiRequest(null, null, "execute"));
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    Map<String, Object> requestBody = new HashMap<>();
+    Map<String, Object> config = new HashMap<>();
+    Map<String, Object> image = new HashMap<>();
+    image.put("value", "ubuntu:latest");
+    config.put("IMAGE", image);
+    requestBody.put("config", config);
+    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
@@ -196,4 +267,48 @@ public class DockerExecPluginTest {
     new DockerExecPlugin().handle(new DefaultGoPluginApiRequest(null, null, "badRequest"));
   }
 
+  @Test
+  public void imageValid() {
+    final DockerExecPlugin dockerExecPlugin = new DockerExecPlugin();
+    assertTrue(dockerExecPlugin.imageValid("t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("t-e_s.t/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("t-e_s.t/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server/t-e_s.t/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server/t-e_s.t/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain/t-e_s.t/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain/t-e_s.t/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server:8080/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server:8080/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server:8080/t-e_s.t/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server:8080/t-e_s.t/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain:8080/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain:8080/t-e_s.t:lat-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain:8080/t-e_s.t/t-e_s.t"));
+    assertTrue(dockerExecPlugin.imageValid("my-server.my-domain:8080/t-e_s.t/t-e_s.t:lat-e_s.t"));
+
+    assertFalse(dockerExecPlugin.imageValid(""));
+    assertFalse(dockerExecPlugin.imageValid("  "));
+    assertFalse(dockerExecPlugin.imageValid("te%sd"));
+    assertFalse(dockerExecPlugin.imageValid("-test"));
+    assertFalse(dockerExecPlugin.imageValid("test:"));
+    assertFalse(dockerExecPlugin.imageValid("test:-latest"));
+    assertFalse(dockerExecPlugin.imageValid("te%st/test"));
+    assertFalse(dockerExecPlugin.imageValid("-test/test"));
+    assertFalse(dockerExecPlugin.imageValid("test/test:"));
+    assertFalse(dockerExecPlugin.imageValid("test/test:-latest"));
+    assertFalse(dockerExecPlugin.imageValid("my$server/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("-myserver/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server:/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server:abc/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server./test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server.my$domain/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server.-mydomain/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server.my-domain:/test/test"));
+    assertFalse(dockerExecPlugin.imageValid("my-server.my-domain:abc/test/test"));
+  }
 }
