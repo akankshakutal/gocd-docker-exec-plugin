@@ -5,7 +5,10 @@ checks:
       threshold: 15
   method-lines:
     config:
-      threshold: 45
+      threshold: 50
+  argument-count:
+    config:
+      threshold: 5
 plugins:
   checkstyle:
     enabled: true
