@@ -3,6 +3,7 @@ package io.bitgrillr.gocddockerexecplugin.utils;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.List;
 import java.util.stream.Collectors;
 import javax.json.Json;
 import javax.json.JsonArray;
@@ -145,7 +146,7 @@ public class GoTestUtils {
   }
 
   /**
-   * Get the console log in String form of the pipeline instance for the specifed stage and job.
+   * Get the console log as a List of Strings from the pipeline instance for the specifed stage and job.
    *
    * @param pipeline Name of the pipeline.
    * @param counter Counter of the pipeline instance.
@@ -155,7 +156,7 @@ public class GoTestUtils {
    * @throws GoError If Go.CD returns a non 2XX response.
    * @throws IOException If a communication error occurs.
    */
-  public static String getPipelineLog(String pipeline, int counter, String stage, String job)
+  public static List<String> getPipelineLog(String pipeline, int counter, String stage, String job)
       throws GoError, IOException {
     final HttpResponse response = executor.execute(
         Request.Get(FILES + pipeline + "/" + counter + "/" + stage + "/1/" + job + "/cruise-output/console.log"))
@@ -165,7 +166,6 @@ public class GoTestUtils {
       throw new GoError(status);
     }
     return new BufferedReader(new InputStreamReader(response.getEntity().getContent())).lines()
-        .collect(Collectors.joining("\n")) + "\n";
+        .collect(Collectors.toList());
   }
-
 }

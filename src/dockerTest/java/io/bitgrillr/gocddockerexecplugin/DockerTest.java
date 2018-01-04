@@ -28,17 +28,57 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest");
-    final int exitCode = DockerUtils.execCommand(containerId, "echo", "Hello world!");
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final int exitCode = DockerUtils.execCommand(containerId, "root", "ls");
     DockerUtils.removeContainer(containerId);
 
     assertThat(console,
         either(hasItem("Status: Image is up to date for busybox:latest"))
             .or(hasItem("Status: Downloaded newer image for busybox:latest")));
     assertThat(console, hasItem("Creating container from image 'busybox:latest'"));
-    assertThat(console, hasItem("Hello world!"));
+    assertThat(console, hasItem("build.gradle"));
     assertEquals("Incorrect exit code", 0, exitCode);
     assertThat(console, hasItem(CoreMatchers.startsWith("Removing container")));
+  }
+
+  @Test
+  public void defaultUser() throws Exception {
+    final List<String> console = mockJobConsoleLogger();
+
+    DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final int exitCode = DockerUtils.execCommand(containerId, null, "sh", "-c", "echo \"UID = $(id -u)\"");
+    DockerUtils.removeContainer(containerId);
+
+    assertEquals("Expected success", 0, exitCode);
+    assertThat("Wrong UID", console, hasItem("UID = 0"));
+  }
+
+  @Test
+  public void setUser() throws Exception {
+    final List<String> console = mockJobConsoleLogger();
+
+    DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
+    final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
+        System.getProperty("user.dir"));
+    final int exitCode = DockerUtils.execCommand(containerId, "go", "sh", "-c", "echo \"UID = $(id -u)\"");
+    DockerUtils.removeContainer(containerId);
+
+    assertEquals("Expected success", 0, exitCode);
+    assertThat("Wrong UID", console, hasItem("UID = 1000"));
+  }
+
+  @Test
+  public void getContainerUid() throws Exception {
+    mockJobConsoleLogger();
+
+    DockerUtils.pullImage("busybox:latest");
+    final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
+        System.getProperty("user.dir"));
+    final String uid = DockerUtils.getContainerUid(containerId);
+    DockerUtils.removeContainer(containerId);
+
+    assertEquals("Wrong UID", "0:0", uid);
   }
 
   @Test(expected = ImageNotFoundException.class)
@@ -52,7 +92,7 @@ public class DockerTest {
   public void badCreate() throws Exception {
     mockJobConsoleLogger();
     // again - please, no-one create this image on the hub
-    DockerUtils.createContainer("idont:exist");
+    DockerUtils.createContainer("idont:exist", System.getProperty("user.dir"));
   }
 
   @Test
@@ -60,8 +100,8 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest");
-    final int exitCode = DockerUtils.execCommand(containerId, "doesntexist");
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final int exitCode = DockerUtils.execCommand(containerId, null, "doesntexist");
     DockerUtils.removeContainer(containerId);
 
     assertNotEquals("Wrong exit code", 0, exitCode);
@@ -73,8 +113,8 @@ public class DockerTest {
     mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest");
-    final int exitCode = DockerUtils.execCommand(containerId, "false");
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final int exitCode = DockerUtils.execCommand(containerId, null, "false");
     DockerUtils.removeContainer(containerId);
 
     assertEquals("Wrong exit code", 1, exitCode);

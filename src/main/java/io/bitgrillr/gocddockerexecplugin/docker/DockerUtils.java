@@ -10,8 +10,11 @@ import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.spotify.docker.client.exceptions.ImagePullFailedException;
 import com.spotify.docker.client.messages.ContainerConfig;
 import com.spotify.docker.client.messages.ExecCreation;
+import com.spotify.docker.client.messages.HostConfig;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -64,15 +67,19 @@ public class DockerUtils {
    * Creates a container for the specified image and starts it with the command 'tail -f /dev/null'.
    *
    * @param image Image to create the container from.
+   * @param pwd Working directory to be bind mounted into the container.
    * @return ID of the created container.
    * @throws DockerException If an error occurs creating the container.
    * @throws InterruptedException If the process is interrupted.
    */
-  public static String createContainer(String image) throws DockerException, InterruptedException {
+  public static String createContainer(String image, String pwd) throws DockerException, InterruptedException {
     JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder())
         .append("Creating container from image '").append(image).append("'").toString());
     final String id  = getDockerClient().createContainer(ContainerConfig.builder().image(image)
-        .cmd("tail", "-f", "/dev/null").build()).id();
+        .cmd("tail", "-f", "/dev/null")
+        .hostConfig(HostConfig.builder().appendBinds(
+            (new StringBuilder()).append(pwd).append(":/app").toString()).build())
+        .workingDir("/app").build()).id();
     JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Created container '").append(id)
         .append("'").toString());
     getDockerClient().startContainer(id);
@@ -82,55 +89,36 @@ public class DockerUtils {
   }
 
   /**
-   * Executes the specified command in the given container as the "root" user. root is used to ensure that any
-   * commands have permissions to write to the build directory.
+   * Executes the specified command in the given container as the specified user.
    *
    * @param containerId Id of the container to execute the command in.
-   * @param cmd Command to execute as an Array of arguments.
+   * @param user User to execute the command as. Pass 'null' to run as default user of the container.
+   * @param cmd Command to execute.
+   * @param args An Array of arguments.
    * @return Exit code of the command.
    * @throws DockerException If an error occurs executing the command.
    * @throws InterruptedException If teh process is interrupted.
    */
-  public static int execCommand(String containerId, String... cmd) throws DockerException, InterruptedException {
-    final StringBuilder execCreateMessage = (new StringBuilder()).append("Creating exec instance for command '");
-    for (int i = 0; i < cmd.length; i++) {
-      execCreateMessage.append(cmd[i]);
-      if (i < cmd.length - 1) {
-        execCreateMessage.append(" ");
-      }
-    }
-    execCreateMessage.append("'");
-    JobConsoleLogger.getConsoleLogger().printLine(execCreateMessage.toString());
-    // for whatever reason, unless all streams are attached, the exec barfs and no-one knows why
-    // see https://github.com/spotify/docker-client/issues/513
-    final ExecCreation execCreation = getDockerClient().execCreate(containerId, cmd,
-        ExecCreateParam.user("root"), ExecCreateParam.attachStdout(), ExecCreateParam.attachStderr(),
-        ExecCreateParam.attachStdin());
-    if (execCreation.warnings() != null && !execCreation.warnings().isEmpty()) {
-      for (final String warning : execCreation.warnings()) {
-        JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("WARNING: ").append(warning)
-            .toString());
-      }
-    }
-    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Created exec instance '")
-        .append(execCreation.id()).append("'").toString());
+  public static int execCommand(String containerId, String user, String cmd, String... args)
+      throws DockerException, InterruptedException {
+    return execCommand(containerId, line -> JobConsoleLogger.getConsoleLogger().printLine(line), user, cmd, args);
+  }
 
-    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Starting exec instance '")
-        .append(execCreation.id()).append("'").toString());
-    try (final LogStream logStream = getDockerClient().execStart(execCreation.id())) {
-      while (logStream.hasNext()) {
-        JobConsoleLogger.getConsoleLogger().printLine(
-            StringUtils.chomp(StandardCharsets.UTF_8.decode(logStream.next().content()).toString()));
-      }
+  /**
+   * Returns the UID of the default user of the container.
+   *
+   * @param containerId Id of the container.
+   * @return The UID of the default user.
+   * @throws DockerException In an error occurs executing the command.
+   * @throws InterruptedException If the process is interrupted.
+   */
+  public static String getContainerUid(String containerId) throws DockerException, InterruptedException {
+    final List<String> uid = new ArrayList<>();
+    final int exitCode = execCommand(containerId, uid::add, null, "sh", "-c", "echo \"$(id -u):$(id -g)\"");
+    if (exitCode != 0) {
+      throw new IllegalStateException("echo ${UID} command failed");
     }
-
-    final Integer exitStatus = getDockerClient().execInspect(execCreation.id()).exitCode();
-    if (exitStatus == null) {
-      throw new IllegalStateException("Exit code of exec comand null");
-    }
-    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Exec instance '")
-        .append(execCreation.id()).append("' exited with status ").append(exitStatus).toString());
-    return exitStatus;
+    return uid.get(0);
   }
 
   /**
@@ -149,6 +137,67 @@ public class DockerUtils {
     JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Removing container '")
         .append(containerId).append("'").toString());
     getDockerClient().removeContainer(containerId, RemoveContainerParam.removeVolumes());
+  }
+
+  private static int execCommand(String containerId, Printer printer, String user, String cmd, String... args)
+      throws DockerException, InterruptedException {
+    final StringBuilder execCreateMessage = (new StringBuilder()).append("Creating exec instance for command '")
+        .append(cmd);
+    for (int i = 0; i < args.length; i++) {
+      execCreateMessage.append(" '");
+      execCreateMessage.append(args[i]);
+      execCreateMessage.append("'");
+    }
+    execCreateMessage.append("'");
+    JobConsoleLogger.getConsoleLogger().printLine(execCreateMessage.toString());
+    String[] cmdArray = new String[args.length + 1];
+    cmdArray[0] = cmd;
+    for (int i = 0; i < args.length; i++) {
+      cmdArray[i + 1] = args[i];
+    }
+    // for whatever reason, unless all streams are attached, the exec barfs and no-one knows why
+    // see https://github.com/spotify/docker-client/issues/513
+    List<ExecCreateParam> execCreateParams = new ArrayList<>();
+    execCreateParams.add(ExecCreateParam.attachStdout());
+    execCreateParams.add(ExecCreateParam.attachStderr());
+    execCreateParams.add(ExecCreateParam.attachStdin());
+    if (user != null) {
+      execCreateParams.add(ExecCreateParam.user(user));
+    }
+    final ExecCreation execCreation = getDockerClient().execCreate(containerId, cmdArray,
+        execCreateParams.toArray(new ExecCreateParam[execCreateParams.size()]));
+    if (execCreation.warnings() != null && !execCreation.warnings().isEmpty()) {
+      for (final String warning : execCreation.warnings()) {
+        JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("WARNING: ").append(warning)
+            .toString());
+      }
+    }
+    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Created exec instance '")
+        .append(execCreation.id()).append("'").toString());
+
+    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Starting exec instance '")
+        .append(execCreation.id()).append("'").toString());
+    try (final LogStream logStream = getDockerClient().execStart(execCreation.id())) {
+      while (logStream.hasNext()) {
+        final String logMessage = StringUtils.chomp(StandardCharsets.UTF_8.decode(logStream.next().content())
+            .toString());
+        for (String logLine : logMessage.split("\n")) {
+          printer.print(logLine);
+        }
+      }
+    }
+
+    final Integer exitStatus = getDockerClient().execInspect(execCreation.id()).exitCode();
+    if (exitStatus == null) {
+      throw new IllegalStateException("Exit code of exec comand null");
+    }
+    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Exec instance '")
+        .append(execCreation.id()).append("' exited with status ").append(exitStatus).toString());
+    return exitStatus;
+  }
+
+  private interface Printer {
+    void print(String line);
   }
 
 }

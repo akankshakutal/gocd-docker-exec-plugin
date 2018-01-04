@@ -15,6 +15,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,6 +69,8 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
   private GoPluginApiResponse handleExecuteRequest(JsonObject requestBody) {
     final String image = requestBody.getJsonObject("config").getJsonObject(IMAGE).getString("value");
+    final String workingDir = requestBody.getJsonObject("context").getString("workingDirectory");
+    final String pwd = Paths.get(System.getProperty("user.dir"), workingDir).toAbsolutePath().toString();
 
     final Map<String, Object> responseBody = new HashMap<>();
     String containerId = null;
@@ -75,11 +78,29 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     try {
       DockerUtils.pullImage(image);
 
-      containerId = DockerUtils.createContainer(image);
+      containerId = DockerUtils.createContainer(image, pwd);
 
-      final int exitCode = DockerUtils.execCommand(containerId, "cat", "/etc/os-release");
+      final String systemUid = SystemHelper.getSystemUid();
+      final String containerUid = DockerUtils.getContainerUid(containerId);
 
-      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("cat /etc/os-release")
+      JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Executing chown to container UID '")
+          .append(containerUid).append("'").toString());
+      final int chownContainerExitCode = DockerUtils.execCommand(containerId, "root", "chown", "-R", containerUid,
+          ".");
+      if (chownContainerExitCode != 0) {
+        throw new IllegalStateException("chown to container UID failed");
+      }
+
+      final int exitCode = DockerUtils.execCommand(containerId, null, "bash", "-c", "touch test && ls -l");
+
+      JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Executing chown back to system UID '")
+          .append(systemUid).append("'").toString());
+      final int chownSystemExitCode = DockerUtils.execCommand(containerId, "root", "chown", "-R", systemUid, ".");
+      if (chownSystemExitCode != 0) {
+        throw new IllegalStateException("chown to system UID failed");
+      }
+
+      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("ls")
           .append("' completed with status ").append(exitCode).toString());
       if (exitCode == 0) {
         responseBody.put(SUCCESS, Boolean.TRUE);
