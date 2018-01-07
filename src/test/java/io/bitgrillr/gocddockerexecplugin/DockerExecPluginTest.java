@@ -153,7 +153,7 @@ public class DockerExecPluginTest {
         response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
     assertEquals("Expected success", Boolean.TRUE, responseBody.getBoolean("success"));
-    assertEquals("Wrong message", "Command 'ls' completed with status 0",
+    assertEquals("Wrong message", "Command 'bash '-c' 'touch test && ls -l'' completed with status 0",
         Json.createReader(new StringReader(response.responseBody())).readObject().getString("message"));
   }
 
