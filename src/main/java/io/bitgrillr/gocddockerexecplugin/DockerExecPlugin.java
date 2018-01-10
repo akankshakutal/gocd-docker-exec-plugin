@@ -1,5 +1,6 @@
 package io.bitgrillr.gocddockerexecplugin;
 
+import com.spotify.docker.client.exceptions.DockerException;
 import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.thoughtworks.go.plugin.api.AbstractGoPlugin;
 import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
@@ -12,9 +13,11 @@ import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Paths;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -68,48 +71,37 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
   private GoPluginApiResponse handleExecuteRequest(JsonObject requestBody) {
     final String image = requestBody.getJsonObject("config").getJsonObject(IMAGE).getString("value");
+    final String workingDir = requestBody.getJsonObject("context").getString("workingDirectory");
+    final String pwd = Paths.get(System.getProperty("user.dir"), workingDir).toAbsolutePath().toString();
 
     final Map<String, Object> responseBody = new HashMap<>();
-    String containerId = null;
-    boolean nestedException = false;
     try {
-      DockerUtils.pullImage(image);
+      final int exitCode = executeBuild(image, pwd);
 
-      containerId = DockerUtils.createContainer(image);
-
-      final int exitCode = DockerUtils.execCommand(containerId, "cat", "/etc/os-release");
-
-      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("cat /etc/os-release")
+      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("bash '-c' 'touch test && ls -l'")
           .append("' completed with status ").append(exitCode).toString());
       if (exitCode == 0) {
         responseBody.put(SUCCESS, Boolean.TRUE);
       } else {
         responseBody.put(SUCCESS, Boolean.FALSE);
       }
+    } catch (DockerCleanupException dce) {
+      responseBody.clear();
+      responseBody.put(SUCCESS, Boolean.FALSE);
+      if (dce.getNested() == null) {
+        responseBody.put(MESSAGE, dce.getCause().getMessage());
+      } else {
+        responseBody.put(MESSAGE, dce.getNested().getMessage());
+      }
     } catch (ImageNotFoundException infe) {
-      nestedException = true;
       responseBody.put(SUCCESS, Boolean.FALSE);
       responseBody.put(MESSAGE, (new StringBuilder()).append("Image '").append(image).append("' not found").toString());
     } catch (Exception e) {
-      nestedException = true;
       responseBody.clear();
       JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while executing task");
-      printException(e);
+      logException(e);
       responseBody.put(SUCCESS, Boolean.FALSE);
       responseBody.put(MESSAGE, e.getMessage());
-    } finally {
-      if (containerId != null) {
-        try {
-          DockerUtils.removeContainer(containerId);
-        } catch (Exception e) {
-          JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while removing container");
-          printException(e);
-          responseBody.put(SUCCESS, Boolean.FALSE);
-          if (!nestedException) {
-            responseBody.put(MESSAGE, e.getMessage());
-          }
-        }
-      }
     }
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(responseBody).build().toString());
@@ -159,14 +151,82 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
 
+  private int executeBuild(String image, String pwd)
+      throws DockerException, InterruptedException, IOException, DockerCleanupException {
+    String containerId = null;
+    Exception nestedException = null;
+    try {
+      DockerUtils.pullImage(image);
+
+      containerId = DockerUtils.createContainer(image, pwd);
+
+      final String systemUid = SystemHelper.getSystemUid();
+      final String containerUid = DockerUtils.getContainerUid(containerId);
+
+      JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Executing chown to container UID '")
+          .append(containerUid).append("'").toString());
+      final int chownContainerExitCode = DockerUtils.execCommand(containerId, "root", "chown", "-R", containerUid,
+          ".");
+      if (chownContainerExitCode != 0) {
+        throw new IllegalStateException("chown to container UID failed");
+      }
+
+      JobConsoleLogger.getConsoleLogger().printLine("Executing command 'bash '-c' 'touch test && ls -l''");
+      final int cmdExitCode = DockerUtils.execCommand(containerId, null, "bash", "-c", "touch test && ls -l");
+
+      JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Executing chown back to system UID '")
+          .append(systemUid).append("'").toString());
+      final int chownSystemExitCode = DockerUtils.execCommand(containerId, "root", "chown", "-R", systemUid, ".");
+      if (chownSystemExitCode != 0) {
+        throw new IllegalStateException("chown to system UID failed");
+      }
+
+      return cmdExitCode;
+    } catch (Exception e) {
+      nestedException = e;
+      throw e;
+    } finally {
+      if (containerId != null) {
+        try {
+          DockerUtils.removeContainer(containerId);
+        } catch (Exception e) {
+          JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while removing container");
+          logException(e);
+          if (nestedException == null) {
+            throw new DockerCleanupException(e);
+          } else {
+            throw new DockerCleanupException(e, nestedException);
+          }
+        }
+      }
+    }
+  }
+
   boolean imageValid(String image) {
     return Pattern.compile(IMAGE_REGEX).matcher(image).matches();
   }
 
-  private void printException(Exception e) {
+  private void logException(Exception e) {
     JobConsoleLogger.getConsoleLogger().printLine(e.getMessage());
     for (StackTraceElement ste : e.getStackTrace()) {
       JobConsoleLogger.getConsoleLogger().printLine("\t" + ste.toString());
+    }
+  }
+
+  private class DockerCleanupException extends Exception {
+    private Throwable nested;
+
+    private DockerCleanupException(Throwable cause) {
+      super(cause);
+    }
+
+    private DockerCleanupException(Throwable cause, Throwable nested) {
+      super(cause);
+      this.nested = nested;
+    }
+
+    public Throwable getNested() {
+      return nested;
     }
   }
 }

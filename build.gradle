@@ -85,16 +85,9 @@ dockerTest {
     jacoco {
         enabled false
     }
-    def dockerHost = System.getenv "DOCKER_HOST"
-    if (dockerHost == null || dockerHost.isEmpty()) {
-        dockerHost = "unix:///var/run/docker.sock"
-    } else {
-        // docker-client does not like tcp protocol
-        if (dockerHost.startsWith('tcp')) {
-            dockerHost = dockerHost.replaceFirst 'tcp', 'http'
-        }
+    if (System.getProperty('os.name').contains('Windows')) {
+       systemProperty('gocddockerexecplugin.dockerhost', 'http://localhost:2375')
     }
-    systemProperty 'gocddockerexecplugin.dockerhost', dockerHost
 }
 
 check.dependsOn dockerTest
@@ -114,6 +107,9 @@ dockerCompose {
 integrationTest {
     jacoco {
         enabled false
+    }
+    if (System.getProperty('os.name').contains('Windows')) {
+        systemProperty('gocddockerexecplugin.dockerhost', 'http://localhost:2375')
     }
 }
 

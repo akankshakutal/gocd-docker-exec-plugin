@@ -58,8 +58,8 @@
   * `gradle assemble`
 * Unit Tests
   * `gradle test`
-* Docker Tests - Tests docker interactions against the live Daemon without Go.cd. These tests respect
-    the `DOCKER_HOST` environment variable (default `unix:///var/run/docker.sock`).
+* Docker Tests - Tests docker interactions against the live Daemon without Go.cd. To run in a Windows environment, make
+    sure the daemon is configured to listen on localhost:2375.
   * `gradle dockerTest`
 * Integration Tests - Uses docker-compose to bring up a server/agent pair + a docker:dind daemon to use and runs
     functional tests.

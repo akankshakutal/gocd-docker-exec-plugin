@@ -1,5 +1,5 @@
 ---
-version: '3'
+version: '3.2'
 services:
   go-server:
     image: 'gocd/gocd-server:v${System.env.GOCD_VERSION ?: "17.3.0"}'
@@ -19,6 +19,17 @@ services:
       - 'AGENT_AUTO_REGISTER_ENVIRONMENTS=test'
       - 'AGENT_AUTO_REGISTER_RESOURCES=docker'
       - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgocddockerexecplugin.dockerhost=http://docker:2375'
+    volumes:
+      - type: volume
+        source: go
+        target: /godata
   docker:
     image: 'docker:dind'
     privileged: true
+    volumes:
+      - type: volume
+        source: go
+        target: /go
+
+volumes:
+  go:
