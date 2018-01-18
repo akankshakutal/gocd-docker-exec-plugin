@@ -14,6 +14,7 @@ import com.spotify.docker.client.messages.HostConfig;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import org.apache.commons.lang.StringUtils;
 
@@ -139,17 +140,29 @@ public class DockerUtils {
     getDockerClient().removeContainer(containerId, RemoveContainerParam.removeVolumes());
   }
 
+  /**
+   * Return a String representation of the given command and arguments, e.g. "'echo 'hello' 'world'".
+   *
+   * @param command Command.
+   * @param arguments Arguments.
+   * @return Printable String.
+   */
+  public static String getCommandString(String command, String... arguments) {
+    return (new StringBuilder())
+        .append("'")
+        .append(command)
+        .append(Arrays.stream(arguments).reduce(
+            new StringBuilder(),
+            (accumulator, value) -> accumulator.append(" '").append(value).append("'"),
+            (partial1, partial2) -> partial1.append(partial2.toString())).toString())
+        .append("'")
+        .toString();
+  }
+
   private static int execCommand(String containerId, Printer printer, String user, String cmd, String... args)
       throws DockerException, InterruptedException {
-    final StringBuilder execCreateMessage = (new StringBuilder()).append("Creating exec instance for command '")
-        .append(cmd);
-    for (int i = 0; i < args.length; i++) {
-      execCreateMessage.append(" '");
-      execCreateMessage.append(args[i]);
-      execCreateMessage.append("'");
-    }
-    execCreateMessage.append("'");
-    JobConsoleLogger.getConsoleLogger().printLine(execCreateMessage.toString());
+    JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Creating exec instance for command ")
+        .append(getCommandString(cmd, args)).toString());
     String[] cmdArray = new String[args.length + 1];
     cmdArray[0] = cmd;
     for (int i = 0; i < args.length; i++) {

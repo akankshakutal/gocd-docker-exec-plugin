@@ -4,7 +4,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
 
@@ -118,20 +117,28 @@ public class DockerExecPluginTest {
     when(DockerUtils.execCommand(anyString(), any(), any())).thenReturn(0);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.removeContainer(anyString());
+    when(DockerUtils.getCommandString(anyString(), any())).thenCallRealMethod();
     PowerMockito.mockStatic(SystemHelper.class);
     when(SystemHelper.getSystemUid()).thenReturn("7:8");
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "ubuntu:latest");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "pipelines/test");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "echo")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .add("value", "Hello\nWorld")
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     PowerMockito.verifyStatic(DockerUtils.class);
@@ -144,7 +151,7 @@ public class DockerExecPluginTest {
     PowerMockito.verifyStatic(DockerUtils.class);
     DockerUtils.execCommand("123", "root", "chown", "-R", "4:5", ".");
     PowerMockito.verifyStatic(DockerUtils.class);
-    DockerUtils.execCommand(eq("123"), eq(null), anyString(), any());
+    DockerUtils.execCommand("123", null, "echo", "Hello", "World");
     PowerMockito.verifyStatic(DockerUtils.class);
     DockerUtils.execCommand("123", "root", "chown", "-R", "7:8", ".");
     PowerMockito.verifyStatic(DockerUtils.class);
@@ -153,8 +160,46 @@ public class DockerExecPluginTest {
         response.responseCode());
     final JsonObject responseBody = Json.createReader(new StringReader(response.responseBody())).readObject();
     assertEquals("Expected success", Boolean.TRUE, responseBody.getBoolean("success"));
-    assertEquals("Wrong message", "Command 'bash '-c' 'touch test && ls -l'' completed with status 0",
+    assertEquals("Wrong message", "Command 'echo 'Hello' 'World'' completed with status 0",
         Json.createReader(new StringReader(response.responseBody())).readObject().getString("message"));
+  }
+
+  @Test
+  public void handleExecuteNoArgs() throws Exception {
+    UnitTestUtils.mockJobConsoleLogger();
+    PowerMockito.mockStatic(DockerUtils.class);
+    PowerMockito.doNothing().when(DockerUtils.class);
+    DockerUtils.pullImage(anyString());
+    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
+    when(DockerUtils.execCommand(anyString(), any(), any())).thenReturn(0);
+    PowerMockito.doNothing().when(DockerUtils.class);
+    DockerUtils.removeContainer(anyString());
+    PowerMockito.mockStatic(SystemHelper.class);
+    when(SystemHelper.getSystemUid()).thenReturn("7:8");
+
+    DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
+    final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
+
+    assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
+    PowerMockito.verifyStatic(DockerUtils.class);
+    DockerUtils.execCommand("123", null, "ls");
   }
 
   @Test
@@ -178,16 +223,22 @@ public class DockerExecPluginTest {
     when(SystemHelper.getSystemUid()).thenReturn("7:8");
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "ubuntu:latest");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "/build");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -207,16 +258,22 @@ public class DockerExecPluginTest {
     DockerUtils.pullImage(anyString());
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "idont:exist");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "/build");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "idont:exist")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -240,16 +297,22 @@ public class DockerExecPluginTest {
     when(SystemHelper.getSystemUid()).thenReturn("7:8");
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "ubuntu:latest");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "/build");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -273,16 +336,22 @@ public class DockerExecPluginTest {
     when(SystemHelper.getSystemUid()).thenReturn("7:8");
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "ubuntu:latest");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "/build");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());
@@ -306,16 +375,22 @@ public class DockerExecPluginTest {
     when(SystemHelper.getSystemUid()).thenReturn("7:8");
 
     DefaultGoPluginApiRequest request = new DefaultGoPluginApiRequest(null, null, "execute");
-    Map<String, Object> requestBody = new HashMap<>();
-    Map<String, Object> config = new HashMap<>();
-    Map<String, Object> image = new HashMap<>();
-    image.put("value", "ubuntu:latest");
-    config.put("IMAGE", image);
-    requestBody.put("config", config);
-    Map<String, Object> context = new HashMap<>();
-    context.put("workingDirectory", "/build");
-    requestBody.put("context", context);
-    request.setRequestBody(Json.createObjectBuilder(requestBody).build().toString());
+    JsonObject requestBody = Json.createObjectBuilder()
+        .add("config", Json.createObjectBuilder()
+            .add("IMAGE", Json.createObjectBuilder()
+                .add("value", "ubuntu:latest")
+                .build())
+            .add("COMMAND", Json.createObjectBuilder()
+                .add("value", "ls")
+                .build())
+            .add("ARGUMENTS", Json.createObjectBuilder()
+                .build())
+            .build())
+        .add("context", Json.createObjectBuilder()
+            .add("workingDirectory", "pipelines/test")
+            .build())
+        .build();
+    request.setRequestBody(requestBody.toString());
     final GoPluginApiResponse response = new DockerExecPlugin().handle(request);
 
     assertEquals("Expected 2xx response", DefaultGoPluginApiResponse.SUCCESS_RESPONSE_CODE, response.responseCode());

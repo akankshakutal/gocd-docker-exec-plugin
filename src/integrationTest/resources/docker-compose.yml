@@ -6,19 +6,24 @@ services:
     ports:
       - '8154:8154'
       - '8153:8153'
+      - '8000:8000'
     volumes:
       - '../../libs:/godata/plugins/external'
       - '../../resources/integrationTest/cruise-config.xml:/godata/config/cruise-config.xml'
       - '../../resources/integrationTest/passwd:/passwd'
+    environment:
+      - 'GO_SERVER_SYSTEM_PROPERTIES=-agentlib:jdwp=transport=dt_socket,address=8000,server=y,suspend=n'
   go-agent:
     image: 'gocd/gocd-agent-ubuntu-16.04:v${System.env.GOCD_VERSION ?: "17.3.0"}'
+    ports:
+      - '8001:8001'
     environment:
       - 'GO_SERVER_URL=https://go-server:8154/go'
       - 'AGENT_AUTO_REGISTER_KEY=a15bb795-ff2c-41f4-b882-6851930a71b9'
       - 'AGENT_AUTO_REGISTER_HOSTNAME=go-agent'
       - 'AGENT_AUTO_REGISTER_ENVIRONMENTS=test'
       - 'AGENT_AUTO_REGISTER_RESOURCES=docker'
-      - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgocddockerexecplugin.dockerhost=http://docker:2375'
+      - 'GO_AGENT_SYSTEM_PROPERTIES=-Dgocddockerexecplugin.dockerhost=http://docker:2375 -agentlib:jdwp=transport=dt_socket,address=8001,server=y,suspend=n'
     volumes:
       - type: volume
         source: go

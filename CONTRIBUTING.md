@@ -62,9 +62,9 @@
     sure the daemon is configured to listen on localhost:2375.
   * `gradle dockerTest`
 * Integration Tests - Uses docker-compose to bring up a server/agent pair + a docker:dind daemon to use and runs
-    functional tests.
+    functional tests. The test containers expose debugging ports on 8000/8001 for the server and agent respectfully.
   * `gradle integrationTest`
-* Bringing up the test Go.cd server/agent pair (password `admin/changeme`).
+* Bringing up the test Go.cd server/agent pair (password `admin/changeme` on https://localhost:8154).
   * `gradle composeUp`
   * `gradle composeDown`
   * *note* - By default these use version 17.3.0, this can be changed using the GOCD_VERSION environment variable.

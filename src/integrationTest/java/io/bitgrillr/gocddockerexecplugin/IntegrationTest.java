@@ -1,5 +1,6 @@
 package io.bitgrillr.gocddockerexecplugin;
 
+import static org.hamcrest.CoreMatchers.containsString;
 import static org.hamcrest.CoreMatchers.endsWith;
 import static org.hamcrest.CoreMatchers.hasItem;
 import static org.junit.Assert.assertEquals;
@@ -13,9 +14,14 @@ import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import io.bitgrillr.gocddockerexecplugin.utils.GoTestUtils;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+import org.hamcrest.CoreMatchers;
 import org.hamcrest.CustomTypeSafeMatcher;
+import org.hamcrest.Matcher;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
@@ -30,15 +36,9 @@ public class IntegrationTest {
 
   @Test
   public void build() throws Exception {
-    final PipelineResult result = PipelineResult.executePipeline("test");
-    assertEquals("Expected success", "Passed", result.result);
-    assertThat("Missing message", result.log, hasItem(endsWith("build.gradle")));
-    assertThat("test file wrong in container", result.log, hasItem(new CustomTypeSafeMatcher<String>("matches") {
-      @Override
-      protected boolean matchesSafely(String item) {
-        return Pattern.compile(".*root root.+test$").matcher(item).matches();
-      }
-    }));
+    verifyPipeline("test", "Passed", Stream.<Matcher<Iterable<? super String>>>builder()
+        .add(hasItem(containsString("BUILD SUCCESSFUL")))
+        .build().collect(Collectors.toList()));
 
     List<String> console = new ArrayList<>();
     JobConsoleLogger logger = mock(JobConsoleLogger.class);
@@ -46,37 +46,44 @@ public class IntegrationTest {
     PowerMockito.mockStatic(JobConsoleLogger.class);
     when(JobConsoleLogger.getConsoleLogger()).thenReturn(logger);
 
-    DockerUtils.execCommand("integrationtest_go-agent_1", null, "ls", "-l", "/go/pipelines/test");
-    assertThat("test file wrong on host", console, hasItem(new CustomTypeSafeMatcher<String>("matches") {
+    DockerUtils.execCommand("integrationtest_go-agent_1", null, "ls", "-l", "/go/pipelines/test/build/libs");
+    assertThat("Created file ownership wrong", console, hasItem(new CustomTypeSafeMatcher<String>("matches") {
       @Override
       protected boolean matchesSafely(String item) {
-        return Pattern.compile(".*go go.+test$").matcher(item).matches();
+        return Pattern.compile(".*go go.+gocddockerexecplugin-.*\\.jar$").matcher(item).matches();
       }
     }));
   }
 
   @Test
   public void noImage() throws Exception {
-    final PipelineResult result = PipelineResult.executePipeline("testNoImage");
-    assertEquals("Expected failure", "Failed", result.result);
-    assertThat("Missing message", result.log, hasItem(endsWith("Image 'idont:exist' not found")));
+    verifyPipeline("testNoImage", "Failed", Stream.<Matcher<Iterable<? super String>>>builder()
+        .add(hasItem(endsWith("Image 'idont:exist' not found")))
+        .build().collect(Collectors.toList()));
   }
 
-  private static class PipelineResult {
-    public final String result;
-    public final List<String> log;
+  @Test
+  public void multiArg() throws Exception {
+    verifyPipeline("testMultiArg", "Passed", Stream.<Matcher<Iterable<? super String>>>builder()
+        .add(CoreMatchers.hasItem(endsWith("Hello World")))
+        .build().collect(Collectors.toList()));
+  }
 
-    private PipelineResult(final String result, final List<String> log) {
-      this.result = result;
-      this.log = log;
-    }
+  @Test
+  public void noArg() throws Exception {
+    verifyPipeline("testNoArg", "Passed", Collections.emptyList());
+  }
 
-    public static PipelineResult executePipeline(String pipeline) throws Exception {
-      final int counter = GoTestUtils.runPipeline(pipeline);
-      GoTestUtils.waitForPipeline(pipeline, counter);
-      final String result = GoTestUtils.getPipelineResult(pipeline, counter);
-      final List<String> log = GoTestUtils.getPipelineLog(pipeline, counter, "test", "test");
-      return new PipelineResult(result, log);
+  private static void verifyPipeline(String pipeline, String expectedResult,
+      List<Matcher<Iterable<? super String>>> logAsserts) throws Exception {
+    final int counter = GoTestUtils.runPipeline(pipeline);
+    GoTestUtils.waitForPipeline(pipeline, counter);
+    final String result = GoTestUtils.getPipelineResult(pipeline, counter);
+    final List<String> log = GoTestUtils.getPipelineLog(pipeline, counter, "test", "test");
+
+    assertEquals("Expected result wrong", expectedResult, result);
+    for (Matcher<Iterable<? super String>> matcher : logAsserts) {
+      assertThat(log, matcher);
     }
   }
 

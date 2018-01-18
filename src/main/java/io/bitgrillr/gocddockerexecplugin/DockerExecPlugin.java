@@ -25,6 +25,7 @@ import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import javax.json.Json;
 import javax.json.JsonObject;
+import javax.json.JsonString;
 
 
 @Extension
@@ -33,6 +34,11 @@ public class DockerExecPlugin extends AbstractGoPlugin {
   private static final String SUCCESS = "success";
   private static final String MESSAGE = "message";
   private static final String IMAGE = "IMAGE";
+  private static final String CONFIG = "config";
+  private static final String VALUE = "value";
+  private static final String DISPLAY_NAME = "display-name";
+  private static final String DISPLAY_ORDER = "display-order";
+
   private static final String IMAGE_REGEX =
       "([a-zA-Z][\\w\\-]*(\\.[a-zA-Z][\\w-]*)*(:\\d+)?/)?(\\w[\\w_\\-.]*/)?\\w[\\w_\\-.]*(:\\w[\\w_\\-.]*)?";
 
@@ -70,16 +76,26 @@ public class DockerExecPlugin extends AbstractGoPlugin {
   }
 
   private GoPluginApiResponse handleExecuteRequest(JsonObject requestBody) {
-    final String image = requestBody.getJsonObject("config").getJsonObject(IMAGE).getString("value");
+    final String image = requestBody.getJsonObject(CONFIG).getJsonObject(IMAGE).getString(VALUE);
+    final String command = requestBody.getJsonObject(CONFIG).getJsonObject("COMMAND").getString(VALUE);
+    final JsonString argumentsJson = requestBody.getJsonObject(CONFIG).getJsonObject("ARGUMENTS")
+        .getJsonString(VALUE);
+    final String[] arguments;
+    if (argumentsJson != null) {
+      arguments = argumentsJson.getString().split("\\r?\\n");
+    } else {
+      arguments = new String[0];
+    }
     final String workingDir = requestBody.getJsonObject("context").getString("workingDirectory");
     final String pwd = Paths.get(System.getProperty("user.dir"), workingDir).toAbsolutePath().toString();
 
     final Map<String, Object> responseBody = new HashMap<>();
     try {
-      final int exitCode = executeBuild(image, pwd);
+      final int exitCode = executeBuild(image, pwd, command, arguments);
 
-      responseBody.put(MESSAGE, (new StringBuilder()).append("Command '").append("bash '-c' 'touch test && ls -l'")
-          .append("' completed with status ").append(exitCode).toString());
+      responseBody.put(MESSAGE, (new StringBuilder()).append("Command ")
+          .append(DockerUtils.getCommandString(command, arguments)).append(" completed with status ").append(exitCode)
+          .toString());
       if (exitCode == 0) {
         responseBody.put(SUCCESS, Boolean.TRUE);
       } else {
@@ -111,7 +127,7 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     final Map<String, Object> responseBody = new HashMap<>();
     final Map<String, String> errors = new HashMap<>();
 
-    final String image = requestBody.getJsonObject(IMAGE).getString("value");
+    final String image = requestBody.getJsonObject(IMAGE).getString(VALUE);
     if (!imageValid(image)) {
       errors.put(IMAGE, (new StringBuilder()).append("'").append(image).append("' is not a valid image identifier")
           .toString());
@@ -144,14 +160,23 @@ public class DockerExecPlugin extends AbstractGoPlugin {
   private GoPluginApiResponse handleConfigRequest() {
     final Map<String, Object> body = new HashMap<>();
     final Map<String, Object> image = new HashMap<>();
-    image.put("display-name", "Image");
-    image.put("display-order", "0");
+    image.put(DISPLAY_NAME, "Image");
+    image.put(DISPLAY_ORDER, "0");
     body.put(IMAGE, image);
+    final Map<String, Object> command = new HashMap<>();
+    command.put(DISPLAY_NAME, "Command");
+    command.put(DISPLAY_ORDER, "1");
+    body.put("COMMAND", command);
+    final Map<String, Object> arguments = new HashMap<>();
+    arguments.put(DISPLAY_NAME, "Arguments");
+    arguments.put(DISPLAY_ORDER, "2");
+    arguments.put("required", false);
+    body.put("ARGUMENTS", arguments);
 
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
 
-  private int executeBuild(String image, String pwd)
+  private int executeBuild(String image, String pwd, String command, String[] arguments)
       throws DockerException, InterruptedException, IOException, DockerCleanupException {
     String containerId = null;
     Exception nestedException = null;
@@ -171,8 +196,15 @@ public class DockerExecPlugin extends AbstractGoPlugin {
         throw new IllegalStateException("chown to container UID failed");
       }
 
-      JobConsoleLogger.getConsoleLogger().printLine("Executing command 'bash '-c' 'touch test && ls -l''");
-      final int cmdExitCode = DockerUtils.execCommand(containerId, null, "bash", "-c", "touch test && ls -l");
+      StringBuilder logLine = (new StringBuilder()).append("Executing command '").append(command);
+      for (String argument : arguments) {
+        logLine.append(" '");
+        logLine.append(argument);
+        logLine.append("'");
+      }
+      logLine.append("'");
+      JobConsoleLogger.getConsoleLogger().printLine(logLine.toString());
+      final int cmdExitCode = DockerUtils.execCommand(containerId, null, command, arguments);
 
       JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Executing chown back to system UID '")
           .append(systemUid).append("'").toString());
@@ -225,7 +257,7 @@ public class DockerExecPlugin extends AbstractGoPlugin {
       this.nested = nested;
     }
 
-    public Throwable getNested() {
+    Throwable getNested() {
       return nested;
     }
   }

@@ -273,4 +273,16 @@ public class DockerUtilsTest {
     assertEquals("Console log incorrect", "Stopping container '123'", console.get(0));
     assertEquals("Console log incorrect", "Removing container '123'", console.get(1));
   }
+
+  @Test
+  public void getCommandString() {
+    final String commandString = DockerUtils.getCommandString("echo", "Hello", "World");
+    assertEquals("'echo 'Hello' 'World''", commandString);
+  }
+
+  @Test
+  public void getCommandStringNoArgs() {
+    final String commandString = DockerUtils.getCommandString("ls");
+    assertEquals("'ls'", commandString);
+  }
 }
