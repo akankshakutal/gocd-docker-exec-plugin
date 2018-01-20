@@ -3,6 +3,7 @@ package io.bitgrillr.gocddockerexecplugin;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
+import static org.mockito.ArgumentMatchers.anyMap;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.any;
 import static org.mockito.Mockito.when;
@@ -20,9 +21,12 @@ import io.bitgrillr.gocddockerexecplugin.utils.UnitTestUtils;
 import java.io.StringReader;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.json.Json;
 import javax.json.JsonObject;
 import org.junit.Test;
@@ -112,7 +116,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), any())).thenReturn(0);
     PowerMockito.doNothing().when(DockerUtils.class);
@@ -136,6 +140,10 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder()
+                .add("TEST1", "value1")
+                .add("TEST2", "value2")
+                .build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -145,7 +153,11 @@ public class DockerExecPluginTest {
     DockerUtils.pullImage("ubuntu:latest");
     PowerMockito.verifyStatic(DockerUtils.class);
     DockerUtils.createContainer("ubuntu:latest",
-        Paths.get(System.getProperty("user.dir"), "pipelines/test").toAbsolutePath().toString());
+        Paths.get(System.getProperty("user.dir"), "pipelines/test").toAbsolutePath().toString(),
+        Stream.<Map.Entry<String, String>>builder()
+            .add(new SimpleEntry<>("TEST1", "value1"))
+            .add(new SimpleEntry<>("TEST2", "value2"))
+            .build().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
     PowerMockito.verifyStatic(DockerUtils.class);
     DockerUtils.getContainerUid("123");
     PowerMockito.verifyStatic(DockerUtils.class);
@@ -170,7 +182,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), any())).thenReturn(0);
     PowerMockito.doNothing().when(DockerUtils.class);
@@ -192,6 +204,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -208,7 +221,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), anyString(), any())).thenAnswer(i -> {
       if (i.getArgument(2).equals("chown")) {
@@ -236,6 +249,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -271,6 +285,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -288,7 +303,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), anyString(), any())).thenThrow(new DockerException("FAIL"));
     PowerMockito.doNothing().when(DockerUtils.class);
@@ -310,6 +325,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -327,7 +343,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), anyString(), any())).thenReturn(0);
     PowerMockito.doThrow(new DockerException("FAIL")).when(DockerUtils.class);
@@ -349,6 +365,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());
@@ -366,7 +383,7 @@ public class DockerExecPluginTest {
     PowerMockito.mockStatic(DockerUtils.class);
     PowerMockito.doNothing().when(DockerUtils.class);
     DockerUtils.pullImage(anyString());
-    when(DockerUtils.createContainer(anyString(), anyString())).thenReturn("123");
+    when(DockerUtils.createContainer(anyString(), anyString(), anyMap())).thenReturn("123");
     when(DockerUtils.getContainerUid(anyString())).thenReturn("4:5");
     when(DockerUtils.execCommand(anyString(), any(), anyString(), any())).thenThrow(new DockerException("FAIL1"));
     PowerMockito.doThrow(new DockerException("FAIL2")).when(DockerUtils.class);
@@ -388,6 +405,7 @@ public class DockerExecPluginTest {
             .build())
         .add("context", Json.createObjectBuilder()
             .add("workingDirectory", "pipelines/test")
+            .add("environmentVariables", Json.createObjectBuilder().build())
             .build())
         .build();
     request.setRequestBody(requestBody.toString());

@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import org.apache.commons.lang.StringUtils;
 
 /**
@@ -73,14 +74,25 @@ public class DockerUtils {
    * @throws DockerException If an error occurs creating the container.
    * @throws InterruptedException If the process is interrupted.
    */
-  public static String createContainer(String image, String pwd) throws DockerException, InterruptedException {
+  public static String createContainer(String image, String pwd, Map<String, String> envVars) throws DockerException,
+      InterruptedException {
     JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder())
         .append("Creating container from image '").append(image).append("'").toString());
     final String id  = getDockerClient().createContainer(ContainerConfig.builder().image(image)
         .cmd("tail", "-f", "/dev/null")
         .hostConfig(HostConfig.builder().appendBinds(
             (new StringBuilder()).append(pwd).append(":/app").toString()).build())
-        .workingDir("/app").build()).id();
+        .workingDir("/app")
+        .env(envVars.entrySet().stream().<List<String>>reduce(
+            new ArrayList<>(),
+            (memo, value) -> {
+              memo.add((new StringBuilder().append(value.getKey()).append("=").append(value.getValue())).toString());
+              return memo;
+            },
+            (memo1, memo2) -> {
+              memo1.addAll(memo2);
+              return memo1;
+            })).build()).id();
     JobConsoleLogger.getConsoleLogger().printLine((new StringBuilder()).append("Created container '").append(id)
         .append("'").toString());
     getDockerClient().startContainer(id);
@@ -165,9 +177,7 @@ public class DockerUtils {
         .append(getCommandString(cmd, args)).toString());
     String[] cmdArray = new String[args.length + 1];
     cmdArray[0] = cmd;
-    for (int i = 0; i < args.length; i++) {
-      cmdArray[i + 1] = args[i];
-    }
+    System.arraycopy(args, 0, cmdArray, 1, args.length);
     // for whatever reason, unless all streams are attached, the exec barfs and no-one knows why
     // see https://github.com/spotify/docker-client/issues/513
     List<ExecCreateParam> execCreateParams = new ArrayList<>();

@@ -1,6 +1,8 @@
 package io.bitgrillr.gocddockerexecplugin.docker;
 
+import static org.hamcrest.CoreMatchers.equalTo;
 import static org.hamcrest.CoreMatchers.hasItem;
+import static org.hamcrest.CoreMatchers.hasItems;
 import static org.hamcrest.CoreMatchers.not;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertThat;
@@ -30,9 +32,13 @@ import com.spotify.docker.client.messages.ProgressMessage;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import io.bitgrillr.gocddockerexecplugin.utils.UnitTestUtils;
 import java.nio.charset.StandardCharsets;
+import java.util.AbstractMap;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.hamcrest.CustomTypeSafeMatcher;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -105,7 +111,11 @@ public class DockerUtilsTest {
     doNothing().when(dockerClient).startContainer(anyString());
     DockerUtils.dockerClient = dockerClient;
 
-    final String id = DockerUtils.createContainer("busybox:latest", "/some-dir");
+    final String id = DockerUtils.createContainer("busybox:latest", "/some-dir",
+        java.util.stream.Stream.<Map.Entry<String, String>>builder()
+        .add(new AbstractMap.SimpleEntry<>("TEST1", "value1"))
+        .add(new AbstractMap.SimpleEntry<>("TEST2", "value2"))
+        .build().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
 
     assertEquals("Wrong ID returned", "123", id);
     assertEquals("Wrong number of lines", 3, console.size());
@@ -117,6 +127,8 @@ public class DockerUtilsTest {
     assertEquals("Image wrong", "busybox:latest", containerConfig.getValue().image());
     assertEquals("Working dir incorrect", "/app", containerConfig.getValue().workingDir());
     assertEquals("Bind mount not correct", "/some-dir:/app", containerConfig.getValue().hostConfig().binds().get(0));
+    assertThat("Environment vars not correct", containerConfig.getValue().env(),
+        hasItems("TEST1=value1", "TEST2=value2"));
   }
 
   @Test(expected = DockerException.class)
@@ -126,7 +138,23 @@ public class DockerUtilsTest {
     when(dockerClient.createContainer(any(ContainerConfig.class))).thenThrow(new DockerException("FAIL"));
     DockerUtils.dockerClient = dockerClient;
 
-    DockerUtils.createContainer("bad:image", "some-dir");
+    DockerUtils.createContainer("bad:image", "some-dir", Collections.emptyMap());
+  }
+
+  @Test
+  public void createContainerEmptyEnvironment() throws Exception {
+    UnitTestUtils.mockJobConsoleLogger();
+    final DefaultDockerClient dockerClient = mock(DefaultDockerClient.class);
+    when(dockerClient.createContainer(any(ContainerConfig.class))).thenReturn(
+        ContainerCreation.builder().id("123").build());
+    doNothing().when(dockerClient).startContainer(anyString());
+    DockerUtils.dockerClient = dockerClient;
+
+    DockerUtils.createContainer("busybox:latest", "/some-dir", Collections.emptyMap());
+
+    ArgumentCaptor<ContainerConfig> containerConfig = ArgumentCaptor.forClass(ContainerConfig.class);
+    verify(dockerClient).createContainer(containerConfig.capture());
+    assertThat("Non-empty env vars", containerConfig.getValue().env(), equalTo(Collections.emptyList()));
   }
 
   @Test

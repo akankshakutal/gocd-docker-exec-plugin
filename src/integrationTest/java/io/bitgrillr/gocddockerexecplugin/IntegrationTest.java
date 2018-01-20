@@ -47,12 +47,7 @@ public class IntegrationTest {
     when(JobConsoleLogger.getConsoleLogger()).thenReturn(logger);
 
     DockerUtils.execCommand("integrationtest_go-agent_1", null, "ls", "-l", "/go/pipelines/test/build/libs");
-    assertThat("Created file ownership wrong", console, hasItem(new CustomTypeSafeMatcher<String>("matches") {
-      @Override
-      protected boolean matchesSafely(String item) {
-        return Pattern.compile(".*go go.+gocddockerexecplugin-.*\\.jar$").matcher(item).matches();
-      }
-    }));
+    assertThat("Created file ownership wrong", console, hasItem(matches(".*go go.+gocddockerexecplugin-.*\\.jar$")));
   }
 
   @Test
@@ -74,6 +69,13 @@ public class IntegrationTest {
     verifyPipeline("testNoArg", "Passed", Collections.emptyList());
   }
 
+  @Test
+  public void envVars() throws Exception {
+    verifyPipeline("testEnvVars", "Passed", Stream.<Matcher<Iterable<? super String>>>builder()
+        .add(hasItem(matches(".*TEST1 = value1, TEST2 = value2, GO_PIPELINE_LABEL = \\d+$")))
+        .build().collect(Collectors.toList()));
+  }
+
   private static void verifyPipeline(String pipeline, String expectedResult,
       List<Matcher<Iterable<? super String>>> logAsserts) throws Exception {
     final int counter = GoTestUtils.runPipeline(pipeline);
@@ -85,6 +87,16 @@ public class IntegrationTest {
     for (Matcher<Iterable<? super String>> matcher : logAsserts) {
       assertThat(log, matcher);
     }
+  }
+
+  private static Matcher<String> matches(String pattern) {
+    return new CustomTypeSafeMatcher<String>((new StringBuilder()).append("a String matching '").append(pattern)
+        .append("'").toString()) {
+      @Override
+      protected boolean matchesSafely(String item) {
+        return Pattern.compile(pattern).matcher(item).matches();
+      }
+    };
   }
 
 }

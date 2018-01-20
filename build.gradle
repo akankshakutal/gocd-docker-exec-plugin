@@ -97,7 +97,7 @@ dockerTest.mustRunAfter test
 // integration tests
 
 processIntegrationTestResources {
-    filesNotMatching('**/passwd') { file -> file.expand project.properties }
+    filesNotMatching(['**/passwd', '**/cruise-config.xml']) { file -> file.expand project.properties }
     filesMatching(['**/cruise-config.xml', '**/passwd']) { file -> file.mode = 0777 }
 }
 

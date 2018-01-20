@@ -8,8 +8,13 @@ import com.spotify.docker.client.exceptions.ContainerNotFoundException;
 import com.spotify.docker.client.exceptions.ImageNotFoundException;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
+import java.util.AbstractMap.SimpleEntry;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import org.hamcrest.CoreMatchers;
 import org.junit.Test;
 import org.junit.runner.RunWith;
@@ -28,7 +33,8 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
+        Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, "root", "ls");
     DockerUtils.removeContainer(containerId);
 
@@ -46,7 +52,8 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
-    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
+        Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, null, "sh", "-c", "echo \"UID = $(id -u)\"");
     DockerUtils.removeContainer(containerId);
 
@@ -60,7 +67,7 @@ public class DockerTest {
 
     DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
     final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
-        System.getProperty("user.dir"));
+        System.getProperty("user.dir"), Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, "go", "sh", "-c", "echo \"UID = $(id -u)\"");
     DockerUtils.removeContainer(containerId);
 
@@ -74,7 +81,7 @@ public class DockerTest {
 
     DockerUtils.pullImage("busybox:latest");
     final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
-        System.getProperty("user.dir"));
+        System.getProperty("user.dir"), Collections.emptyMap());
     final String uid = DockerUtils.getContainerUid(containerId);
     DockerUtils.removeContainer(containerId);
 
@@ -92,7 +99,7 @@ public class DockerTest {
   public void badCreate() throws Exception {
     mockJobConsoleLogger();
     // again - please, no-one create this image on the hub
-    DockerUtils.createContainer("idont:exist", System.getProperty("user.dir"));
+    DockerUtils.createContainer("idont:exist", System.getProperty("user.dir"), Collections.emptyMap());
   }
 
   @Test
@@ -100,7 +107,8 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
+        Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, null, "doesntexist");
     DockerUtils.removeContainer(containerId);
 
@@ -113,7 +121,8 @@ public class DockerTest {
     mockJobConsoleLogger();
 
     DockerUtils.pullImage("busybox:latest");
-    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"));
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
+        Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, null, "false");
     DockerUtils.removeContainer(containerId);
 
@@ -125,6 +134,22 @@ public class DockerTest {
     mockJobConsoleLogger();
 
     DockerUtils.removeContainer("shouldnotexist");
+  }
+
+  @Test
+  public void testEnvVars() throws Exception {
+    final List<String> console = mockJobConsoleLogger();
+
+    DockerUtils.pullImage("busybox:latest");
+    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
+        Stream.<Map.Entry<String, String>>builder()
+            .add(new SimpleEntry<>("TEST", "value"))
+            .build().collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)));
+    final int exitCode = DockerUtils.execCommand(containerId, null, "sh", "-c", "echo \"TEST = $TEST\"");
+    DockerUtils.removeContainer(containerId);
+
+    assertThat("non-zero exit code", exitCode, equalTo(0));
+    assertThat("env var value not correct", console, hasItem("TEST = value"));
   }
 
   private List<String> mockJobConsoleLogger() {

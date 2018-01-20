@@ -18,6 +18,7 @@ import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
+import java.util.AbstractMap;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
@@ -86,12 +87,16 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     } else {
       arguments = new String[0];
     }
+    Map<String, String> envVars = requestBody.getJsonObject("context").getJsonObject("environmentVariables").entrySet()
+        .stream()
+        .map(e -> new AbstractMap.SimpleEntry<>(e.getKey(), ((JsonString) e.getValue()).getString()))
+        .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
     final String workingDir = requestBody.getJsonObject("context").getString("workingDirectory");
     final String pwd = Paths.get(System.getProperty("user.dir"), workingDir).toAbsolutePath().toString();
 
     final Map<String, Object> responseBody = new HashMap<>();
     try {
-      final int exitCode = executeBuild(image, pwd, command, arguments);
+      final int exitCode = executeBuild(image, pwd, envVars, command, arguments);
 
       responseBody.put(MESSAGE, (new StringBuilder()).append("Command ")
           .append(DockerUtils.getCommandString(command, arguments)).append(" completed with status ").append(exitCode)
@@ -176,14 +181,14 @@ public class DockerExecPlugin extends AbstractGoPlugin {
     return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
   }
 
-  private int executeBuild(String image, String pwd, String command, String[] arguments)
+  private int executeBuild(String image, String pwd, Map<String, String> envVars, String command, String[] arguments)
       throws DockerException, InterruptedException, IOException, DockerCleanupException {
     String containerId = null;
     Exception nestedException = null;
     try {
       DockerUtils.pullImage(image);
 
-      containerId = DockerUtils.createContainer(image, pwd);
+      containerId = DockerUtils.createContainer(image, pwd, envVars);
 
       final String systemUid = SystemHelper.getSystemUid();
       final String containerUid = DockerUtils.getContainerUid(containerId);

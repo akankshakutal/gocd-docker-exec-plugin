@@ -143,6 +143,50 @@ World</value>
         </jobs>
       </stage>
     </pipeline>
+    <pipeline name="testEnvVars">
+      <environmentvariables>
+        <variable name="TEST1">
+          <value>value1</value>
+        </variable>
+        <variable name="TEST2">
+          <value>value2</value>
+        </variable>
+      </environmentvariables>
+      <materials>
+        <git url="https://github.com/cma-arnold/gocd-docker-exec-plugin" autoUpdate="false" />
+      </materials>
+      <stage name="test">
+        <approval type="manual" />
+        <jobs>
+          <job name="test">
+            <tasks>
+              <task>
+                <pluginConfiguration id="docker-exec-plugin" version="1" />
+                <configuration>
+                  <property>
+                    <key>IMAGE</key>
+                    <value>ubuntu:latest</value>
+                  </property>
+                  <property>
+                    <key>COMMAND</key>
+                    <value>bash</value>
+                  </property>
+                  <property>
+                    <key>ARGUMENTS</key>
+                    <value>-c&#xD;
+echo "TEST1 = $TEST1, TEST2 = $TEST2, GO_PIPELINE_LABEL = $GO_PIPELINE_LABEL"
+                    </value>
+                  </property>
+                </configuration>
+              </task>
+            </tasks>
+            <resources>
+              <resource>docker</resource>
+            </resources>
+          </job>
+        </jobs>
+      </stage>
+    </pipeline>
   </pipelines>
   <environments>
     <environment name="test">
@@ -151,6 +195,7 @@ World</value>
         <pipeline name="testNoImage" />
         <pipeline name="testMultiArg" />
         <pipeline name="testNoArg" />
+        <pipeline name="testEnvVars" />
       </pipelines>
     </environment>
   </environments>
