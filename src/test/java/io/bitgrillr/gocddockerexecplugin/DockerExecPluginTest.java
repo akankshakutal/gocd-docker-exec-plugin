@@ -18,7 +18,10 @@ import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
 import io.bitgrillr.gocddockerexecplugin.utils.UnitTestUtils;
+import java.io.IOException;
+import java.io.InputStream;
 import java.io.StringReader;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.AbstractMap.SimpleEntry;
@@ -29,6 +32,7 @@ import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import javax.json.Json;
 import javax.json.JsonObject;
+import org.apache.commons.io.IOUtils;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.powermock.api.mockito.PowerMockito;
@@ -36,7 +40,7 @@ import org.powermock.core.classloader.annotations.PrepareForTest;
 import org.powermock.modules.junit4.PowerMockRunner;
 
 @RunWith(PowerMockRunner.class)
-@PrepareForTest({JobConsoleLogger.class, DockerUtils.class, SystemHelper.class})
+@PrepareForTest({JobConsoleLogger.class, DockerUtils.class, SystemHelper.class, IOUtils.class})
 public class DockerExecPluginTest {
 
   @Test
@@ -69,8 +73,16 @@ public class DockerExecPluginTest {
   }
 
   @Test
-  public void handleViewError() {
-    // TODO: write this
+  public void handleViewError() throws Exception {
+    PowerMockito.mockStatic(IOUtils.class);
+    when(IOUtils.toString(any(InputStream.class), any(Charset.class))).thenThrow(new IOException("TESTERROR"));
+
+    GoPluginApiResponse response = new DockerExecPlugin().handle(
+        new DefaultGoPluginApiRequest(null, null, "view"));
+
+    assertEquals("Expect 5xx response", DefaultGoPluginApiResponse.INTERNAL_ERROR, response.responseCode());
+    assertEquals("Wrong body", "TESTERROR",
+        Json.createReader(new StringReader(response.responseBody())).readObject().getString("exception"));
   }
 
   @Test

@@ -6,15 +6,14 @@ import com.thoughtworks.go.plugin.api.AbstractGoPlugin;
 import com.thoughtworks.go.plugin.api.GoPluginIdentifier;
 import com.thoughtworks.go.plugin.api.annotation.Extension;
 import com.thoughtworks.go.plugin.api.exceptions.UnhandledRequestTypeException;
+import com.thoughtworks.go.plugin.api.logging.Logger;
 import com.thoughtworks.go.plugin.api.request.GoPluginApiRequest;
 import com.thoughtworks.go.plugin.api.response.DefaultGoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.response.GoPluginApiResponse;
 import com.thoughtworks.go.plugin.api.task.JobConsoleLogger;
 
 import io.bitgrillr.gocddockerexecplugin.docker.DockerUtils;
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Paths;
@@ -27,6 +26,7 @@ import java.util.stream.Collectors;
 import javax.json.Json;
 import javax.json.JsonObject;
 import javax.json.JsonString;
+import org.apache.commons.io.IOUtils;
 
 
 @Extension
@@ -119,8 +119,6 @@ public class DockerExecPlugin extends AbstractGoPlugin {
       responseBody.put(MESSAGE, (new StringBuilder()).append("Image '").append(image).append("' not found").toString());
     } catch (Exception e) {
       responseBody.clear();
-      JobConsoleLogger.getConsoleLogger().printLine("Exception occurred while executing task");
-      logException(e);
       responseBody.put(SUCCESS, Boolean.FALSE);
       responseBody.put(MESSAGE, e.getMessage());
     }
@@ -144,11 +142,8 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
   private GoPluginApiResponse handleViewRequest() {
     try {
-      final String template;
-      try (BufferedReader reader = new BufferedReader(new InputStreamReader(
-          getClass().getResourceAsStream("/templates/task.template.html"), StandardCharsets.UTF_8))) {
-        template = reader.lines().collect(Collectors.joining("\n")) + "\n";
-      }
+      final String template = IOUtils.toString(getClass().getResourceAsStream("/templates/task.template.html"),
+          StandardCharsets.UTF_8);
 
       final Map<String, Object> body = new HashMap<>();
       body.put("displayValue", "Docker Exec");
@@ -156,7 +151,7 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
       return DefaultGoPluginApiResponse.success(Json.createObjectBuilder(body).build().toString());
     } catch (Exception e) {
-      e.printStackTrace();
+      Logger.getLoggerFor(this.getClass()).error("Error retrieving template", e);
       final String body = Json.createObjectBuilder().add("exception", e.getMessage()).build().toString();
       return DefaultGoPluginApiResponse.error(body);
     }
@@ -220,6 +215,8 @@ public class DockerExecPlugin extends AbstractGoPlugin {
 
       return cmdExitCode;
     } catch (Exception e) {
+      JobConsoleLogger.getConsoleLogger().printLine("Exception occurred during build");
+      logException(e);
       nestedException = e;
       throw e;
     } finally {
