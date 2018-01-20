@@ -52,8 +52,8 @@ public class DockerTest {
     final List<String> console = mockJobConsoleLogger();
 
     DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
-    final String containerId = DockerUtils.createContainer("busybox:latest", System.getProperty("user.dir"),
-        Collections.emptyMap());
+    final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
+        System.getProperty("user.dir"), Collections.emptyMap());
     final int exitCode = DockerUtils.execCommand(containerId, null, "sh", "-c", "echo \"UID = $(id -u)\"");
     DockerUtils.removeContainer(containerId);
 
@@ -79,7 +79,7 @@ public class DockerTest {
   public void getContainerUid() throws Exception {
     mockJobConsoleLogger();
 
-    DockerUtils.pullImage("busybox:latest");
+    DockerUtils.pullImage("gocd/gocd-agent-ubuntu-16.04:v17.3.0");
     final String containerId = DockerUtils.createContainer("gocd/gocd-agent-ubuntu-16.04:v17.3.0",
         System.getProperty("user.dir"), Collections.emptyMap());
     final String uid = DockerUtils.getContainerUid(containerId);
