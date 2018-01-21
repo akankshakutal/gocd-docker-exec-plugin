@@ -2,7 +2,7 @@
 
 ## General Guidelines
 
-* Code review by a [maintainer](CODEOWNERS) is required for all pull requests.
+* Code review by a [maintainer](.github/CODEOWNERS) is required for all pull requests.
 * All checks (Travis and CodeClimate) are required to pass for a pull request. If you believe a CodeClimate check
   is invalid for a particular case (it happens) feel free to reach out on Gitter to make a case for marking it ignored.
 * Code is expected to follow the [google java style](https://google.github.io/styleguide/javaguide.html) with the
@@ -48,7 +48,7 @@
 ## Requirements
 
 * Java 8
-* Gradle 4
+* Gradle 4.4
 * Docker
 * docker-compose
 
