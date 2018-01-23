@@ -1,7 +1,10 @@
+import groovy.json.JsonSlurper
+
 plugins {
     id 'com.avast.gradle.docker-compose' version '0.6.9'
     id 'org.unbroken-dome.test-sets' version '1.4.2'
     id 'com.github.ben-manes.versions' version '0.17.0'
+    id 'com.github.hierynomus.license' version '0.14.0'
 }
 
 group 'io.bitgrillr'
@@ -119,3 +122,34 @@ composeUp.dependsOn assemble
 composeUp.dependsOn processIntegrationTestResources
 check.dependsOn integrationTest
 integrationTest.mustRunAfter dockerTest
+
+// license shit
+
+license {
+    header project.file('LICENSE_HEADER')
+    ext.year = Calendar.getInstance().get(Calendar.YEAR)
+}
+
+downloadLicenses {
+    dependencyConfiguration = 'library'
+}
+
+task formatLicenses {
+    doLast {
+        def licenses = new JsonSlurper().parseText(new File('build/reports/license/dependency-license.json').text)
+        new File('src/main/resources/THIRD-PARTY.md').withWriter { writer ->
+            writer.writeLine '# Third-Party Software'
+            writer.writeLine ''
+            writer.writeLine 'This software makes use of the following third-party components.'
+            writer.writeLine ''
+            for (dep in licenses.dependencies) {
+                writer.writeLine "* ${dep.name}"
+                for (license in dep.licenses) {
+                    writer.writeLine "  * [${license.name}](${license.url})"
+                }
+            }
+        }
+    }
+}
+
+formatLicenses.dependsOn 'downloadLicenses'

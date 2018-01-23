@@ -68,3 +68,19 @@
   * `gradle composeUp`
   * `gradle composeDown`
   * *note* - By default these use version 17.3.0, this can be changed using the GOCD_VERSION environment variable.
+  
+## Release Process
+
+1. Run `gradle licenseFormat` to update license headers.
+2. Run `gradle downloadLicenses` to generate license report. Check against the
+   [naughty list](https://www.apache.org/legal/resolved.html#category-x).
+3. Run `gradle formateLicenses` to generate the third-party report in `src/main/resources`.
+4. Commit and merge as `X.Y.Z release prep`.
+5. Remove `SNAPSHOT` from version.
+6. Remove UNRELEASED from CHANGELOG.
+7. Commit and tag with `X.Y.Z`.
+8. Push for release build.
+9. Pull release artifact from Github and do a UI smoke test.
+10. Attach relevant portion of the CHANGELOG to the Github release.
+11. TODO - Update release on gocd.org (however that's done).
+12. Increment version to `X.Y.Z+1-SNAPSHOT` and start new section of CHANGELOG.
