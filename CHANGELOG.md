@@ -1,5 +1,7 @@
 # Changelog
 
+## 1.0.1 (UNRELEASED)
+
 ## 1.0.0
 
 ### Features
